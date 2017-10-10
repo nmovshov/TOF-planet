@@ -53,7 +53,7 @@ classdef TOFPlanet < handle
             obj.opts = tofset(varargin{:});
             
             % Initialize density grid (usually replaced by user!)
-            obj.zvec = linspace(1,0,N)';
+            obj.zvec = linspace(0,1,N)';
             obj.dvec = ones(size(obj.zvec));
             
             % Initialize shape functions
@@ -64,7 +64,6 @@ classdef TOFPlanet < handle
             
             % Set other defaults
             obj.mrot = 0;
-            
         end
     end % End of constructor block
     
@@ -88,6 +87,22 @@ classdef TOFPlanet < handle
                 fprintf('  Calculating hydrostatic equilibrium...done.\n')
                 fprintf('  Elapsed time %s\n',lower(seconds2human(ET)))
             end
+        end
+        
+        function r = level_surface(obj, l, theta)
+            % Return r_l(theta) by expansion of Legendre polynomials.
+            %
+            % Usage:r = tof(l, theta)
+            
+            validateattributes(l,{'numeric'},{'positive','scalar','<=',1},'','l',1)
+            validateattributes(theta,{'numeric'},{'vector','>=',0,'<=',2*pi},'','theta',2)
+            
+            k = find(obj.zvec >= l, 1, 'first');
+            mu = cos(theta);
+            shp = obj.ss.s0(k)*Pn(0,mu) + obj.ss.s2(k)*Pn(2,mu) + ...
+                obj.ss.s4(k)*Pn(4,mu) + obj.ss.s6(k)*Pn(6,mu) + ...
+                obj.ss.s8(k)*Pn(8,mu);
+            r = obj.zvec(k)*(1 + shp);
         end
     end % End of public methods block
     
@@ -124,3 +139,40 @@ classdef TOFPlanet < handle
     end % End of static methods block
 end % End of classdef
 
+%% Class-related functions
+function y = Pn(n,x)
+% Fast implementation of ordinary Legendre polynomials of low degree.
+switch n
+    case 0
+        y = ones(size(x));
+    case 1
+        y = x;
+    case 2
+        y = 0.5*(3*x.^2 - 1);
+    case 3
+        y = 0.5*(5*x.^3 - 3*x);
+    case 4
+        y = (1/8)*(35*x.^4 - 30*x.^2 + 3);
+    case 5
+        y = (1/8)*(63*x.^5 - 70*x.^3 + 15*x);
+    case 6
+        y = (1/16)*(231*x.^6 - 315*x.^4 + 105*x.^2 - 5);
+    case 7
+        y = (1/16)*(429*x.^7 - 693*x.^5 + 315*x.^3 - 35*x);
+    case 8
+        y = (1/128)*(6435*x.^8 - 12012*x.^6 + 6930*x.^4 - 1260*x.^2 + 35);
+    case 9
+        y = (1/128)*(12155*x.^9 - 25740*x.^7 + 18018*x.^5 - 4620*x.^3 + 315*x);
+    case 10
+        y = (1/256)*(46189*x.^10 - 109395*x.^8 + 90090*x.^6 - 30030*x.^4 + 3465*x.^2 - 63);
+    case 11
+        y = (1/256)*(88179*x.^11 - 230945*x.^9 + 218790*x.^7 - 90090*x.^5 + 15015*x.^3 - 693*x);
+    case 12
+        y = (1/1024)*(676039*x.^12 - 1939938*x.^10 + 2078505*x.^8 - 1021020*x.^6 + 225225*x.^4 - 18018*x.^2 + 231);
+    otherwise
+        assert(isvector(x))
+        Pnm = legendre(n,x);
+        y = Pnm(1,:);
+        if ~isrow(x), y = y'; end
+end
+end
