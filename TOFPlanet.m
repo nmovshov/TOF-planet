@@ -18,6 +18,22 @@ classdef TOFPlanet < handle
         
         opts % holds user configurable options
     end
+    properties (SetAccess = private)
+        ss   % shape functions (returned by tof4.m)
+        SS   % shape functions (returned by tof4.m)
+        Js   % external gravity coefficients (returned by tof4.m)
+    end
+    properties (Dependent)
+        qrot
+        a0
+        J2
+        J4
+        J6
+        J8
+    end
+    properties (Access = private)
+        aos = 1
+    end
     
     %% A simple constructor
     methods
@@ -36,15 +52,43 @@ classdef TOFPlanet < handle
             % Populate options struct
             obj.opts = tofset(varargin{:});
             
-            % Set a default density grid - usually replaced by user
+            % Initialize density grid (usually replaced by user!)
             obj.zvec = linspace(1,0,N)';
             obj.dvec = ones(size(obj.zvec));
+            
+            % Initialize shape functions
+            ss.s0(N,1)=0; ss.s2(N,1)=0; ss.s4(N,1)=0; ss.s6(N,1)=0; ss.s8(N,1)=0;
+            SS.S0(N,1)=0; SS.S2(N,1)=0; SS.S4(N,1)=0; SS.S6(N,1)=0; SS.S8(N,1)=0;
+            obj.ss = ss;
+            obj.SS = SS;
+            
+            % Set other defaults
+            obj.mrot = 0;
             
         end
     end % End of constructor block
     
     %% Public methods
     methods (Access = public)
+        function ET = relax_to_HE(obj)
+            % Call tof4 to obtain equilibrium shape and gravity.
+            
+            if (obj.opts.verbosity > 1)
+                fprintf('  Calculating hydrostatic equilibrium...\n')
+            end
+            
+            tic
+            [obj.Js, out] = tof4(obj.zvec, obj.dvec, obj.mrot);
+            ET = toc;
+            obj.ss = out.ss;
+            obj.SS = out.SS;
+            obj.aos = out.a0;
+            
+            if (obj.opts.verbosity > 1)
+                fprintf('  Calculating hydrostatic equilibrium...done.\n')
+                fprintf('  Elapsed time %s\n',lower(seconds2human(ET)))
+            end
+        end
     end % End of public methods block
     
     %% Private methods
@@ -53,6 +97,26 @@ classdef TOFPlanet < handle
     
     %% Access methods
     methods
+        function val = get.a0(obj)
+            val = obj.aos*obj.s0;
+        end
+        
+        function val = get.J2(obj)
+            val = obj.Js(2);
+        end
+        
+        function val = get.J4(obj)
+            val = obj.Js(3);
+        end
+        
+        function val = get.J6(obj)
+            val = obj.Js(4);
+        end
+        
+        function val = get.J8(obj)
+            val = obj.Js(5);
+        end
+        
     end % End of access methods block
     
     %% Static methods

@@ -64,6 +64,7 @@ out.iter = iter;
 out.a0 = a0;
 out.qrot = mrot*a0^3;
 out.ss = ss;
+out.SS = SS;
 
 end
 
