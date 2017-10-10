@@ -29,7 +29,6 @@ p.addParameter('dJtol',1e-8,@isposscalar)
 p.addParameter('dBtol',1e-6,@isposscalar)
 p.addParameter('MaxIter',40,@isposintscalar)
 p.addParameter('verbosity',1,@isnonnegintscalar)
-p.addParameter('email','',@isvalidemail)
 
 % Parse name-value pairs and return.
 p.parse(varargin{:})

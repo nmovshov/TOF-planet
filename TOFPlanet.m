@@ -8,14 +8,38 @@ classdef TOFPlanet < handle
     %% Properties
     properties
         name % model name
+        s0   % mean radius
+        M    % mass
+        mrot % rotation parameter, w^2s0^3/GM
+        eos  % barotrope(s) (tip: help barotropes for options)
+        
+        zvec % mean radii normalized by s0
+        dvec % density normalized by mean density
+        
         opts % holds user configurable options
     end
     
     %% A simple constructor
     methods
-        function obj = TOFPlanet(varargin)
-            % The constructor only populates the options struct.
+        function obj = TOFPlanet(N, varargin)
+            % A simple constructor of TOFPlanet objects.
+            % TOFPlanet(N, 'OPTION1', VALUE, 'OPTION2', VALUE2,...)
+            
+            % The grid size os required
+            if nargin == 0
+                error(['Required argument missing: specify number of radius',...
+                    ' grid points as first input argument.'])
+            end
+            validateattributes(N,{'numeric'},{'positive','integer','scalar'},...
+                '','N',1)
+            
+            % Populate options struct
             obj.opts = tofset(varargin{:});
+            
+            % Set a default density grid - usually replaced by user
+            obj.zvec = linspace(1,0,N)';
+            obj.dvec = ones(size(obj.zvec));
+            
         end
     end % End of constructor block
     
