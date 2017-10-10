@@ -8,15 +8,19 @@ classdef TOFPlanet < handle
     %% Properties
     properties
         name % model name
-        s0   % mean radius
+        Rm   % mean radius
         M    % mass
         mrot % rotation parameter, w^2s0^3/GM
         eos  % barotrope(s) (tip: help barotropes for options)
-        
+        opts % holds user configurable options
+    end
+    properties (Dependent)
+        si   % vector of mean radii, top down
+        rhoi % vector of densities on si grid
+    end
+    properties
         zvec % mean radii normalized by s0
         dvec % density normalized by mean density
-        
-        opts % holds user configurable options
     end
     properties (SetAccess = private)
         ss   % shape functions (returned by tof4.m)
@@ -24,8 +28,10 @@ classdef TOFPlanet < handle
         Js   % external gravity coefficients (returned by tof4.m)
     end
     properties (Dependent)
+        M_calc
+        rhobar
         qrot
-        a0
+        Req
         J2
         J4
         J6
@@ -73,18 +79,18 @@ classdef TOFPlanet < handle
             % Call tof4 to obtain equilibrium shape and gravity.
             
             if (obj.opts.verbosity > 1)
-                fprintf('  Calculating hydrostatic equilibrium...\n')
+                fprintf('  Relaxing to hydrostatic equilibrium...\n')
             end
             
             tic
-            [obj.Js, out] = tof4(obj.zvec, obj.dvec, obj.mrot);
+            [obj.Js, out] = tof4(obj.zvec, obj.dvec, obj.mrot, obj.opts.dJtol);
             ET = toc;
             obj.ss = out.ss;
             obj.SS = out.SS;
             obj.aos = out.a0;
             
             if (obj.opts.verbosity > 1)
-                fprintf('  Calculating hydrostatic equilibrium...done.\n')
+                fprintf('  Relaxing to hydrostatic equilibrium...done.\n')
                 fprintf('  Elapsed time %s\n',lower(seconds2human(ET)))
             end
         end
@@ -112,8 +118,12 @@ classdef TOFPlanet < handle
     
     %% Access methods
     methods
-        function val = get.a0(obj)
-            val = obj.aos*obj.s0;
+        function val = get.qrot(obj)
+            val = obj.mrot*obj.aos^3;
+        end
+        
+        function val = get.Req(obj)
+            val = obj.aos*obj.Rm;
         end
         
         function val = get.J2(obj)
