@@ -148,17 +148,18 @@ function ss = solve_B1215(ss0, SS, mrot)
 % Solve the system B.12-B.15 for unknowns s2,s4,s6,s8.
 
 opts = optimset();
+opts.TolX = 1e-10;
+opts.TolFun = 1e-10;
 opts.display = 'off';
 Y = nan(length(SS.S0), 5);
-for k=1:length(SS.S0)
-    S = [SS.S0(k), SS.S2(k), SS.S4(k), SS.S6(k), SS.S8(k)];
+parfor k=1:length(SS.S0)
+    S = [SS.S0(k), SS.S2(k), SS.S4(k), SS.S6(k), SS.S8(k)]; %#ok<PFBNS>
     Sp = [SS.S0p(k), SS.S2p(k), SS.S4p(k), SS.S6p(k), SS.S8p(k)];
-    s0 = [ss0.s2(k), ss0.s4(k), ss0.s6(k), ss0.s8(k)];
+    s0 = [ss0.s2(k), ss0.s4(k), ss0.s6(k), ss0.s8(k)]; %#ok<PFBNS>
     fun = @(x)B1215(x, S, Sp, mrot);
-    Y(k,2:5) = fsolve(fun, s0, opts);
-
-    % And eq. B.2 too
-    Y(k,1) = -1/5*Y(k,2)^2 - 2/105*Y(k,2)^3 - 1/9*Y(k,3)^2 - 2/35*Y(k,2)^2*Y(k,3);
+    XX = [0, fsolve(fun, s0, opts)];
+    XX(1) = -1/5*XX(2)^2 - 2/105*XX(2)^3 - 1/9*XX(3)^2 - 2/35*XX(2)^2*XX(3);
+    Y(k,:) = XX;
 end
 ss.s0 = Y(:,1); ss.s2 = Y(:,2); ss.s4 = Y(:,3); ss.s6 = Y(:,4); ss.s8 = Y(:,5);
 end

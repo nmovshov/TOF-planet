@@ -48,9 +48,10 @@ catch
 end
 
 %% Now set up a TOFPlanet to mimic constant density case
-% The default initialization by teh constructor sets up a const. density planet.
 N = 2; % can be any number though!
 tof = TOFPlanet(N);
+tof.si = linspace(1,1/N,N)';
+tof.rhoi = ones(N,1);
 tof.mrot = m;
 tof.relax_to_HE();
 
@@ -79,7 +80,7 @@ ah.Title.Interpreter = 'latex';
 ah.XLabel.String = '$\mu = \cos(\theta)$';
 ah.YLabel.String = '$d\xi$';
 ah.Title.String = '$d\xi = \xi(\mu) - 1/\sqrt{1 + l^2\mu^2}$';
-xi_err = max(abs(dxi));
+xi_err = max(abs(dxi)) %#ok<NOPTS>
 %b_err = b_cms - b_exact %#ok<NOPTS>
 
 % Compare the J values

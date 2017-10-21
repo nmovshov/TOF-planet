@@ -11,11 +11,12 @@ clear
 clc
 close all
 
-%% Set up a TOF object and give it a density profile linear in zvec
-N = 128;
+%% Set up a TOF object and give it a density profile linear in mean radii
+N = 24;
 tof = TOFPlanet(N);
+tof.si = linspace(1, 1/N, N)';
 dl = 1/(N-1);
-tof.dvec = [1:-dl:0];
+tof.rhoi = [0:dl:1]';
 tof.mrot = 0.0830; % Hubbard (2013) Table 1
 
 %% Relax to hydrostatic equilibrium

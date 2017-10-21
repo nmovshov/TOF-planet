@@ -10,10 +10,12 @@ function options = tofset(varargin)
 %
 %KNOWN PROPERTIES
 %
-%dJtol - Convergence tolerance for hydrostatic equilibrium [ positive real {1e-8} ]
-%dBtol - Convergence tolerance for barotrope adjustment [ positive real {1e-6} ]
-%MaxIter - Maximum number of iterations allowed for relaxation [ positive integer {40} ]
+%dJtol - Convergence tolerance for gravity coefficients [ positive real {1e-8} ]
+%drhotol - Convergence tolerance for density adjustment [ positive real {1e-6} ]
+%MaxIterBar - Number of iterations allowed for relaxation to barotrope [ positive integer {60} ]
+%MaxIterHE - Number of iterations allowed for relaxation to equilibrium shape [ positive integer {60} ]
 %verbosity - Level of runtime messages [0 {1} 2 3 4]
+%debug - Debug mode flag (use preals instead of doubles) [ true | {false} ]
 
 % If no arguments print usage and return.
 if (nargin == 0) && (nargout == 0)
@@ -26,9 +28,11 @@ p = inputParser;
 p.FunctionName = mfilename;
 
 p.addParameter('dJtol',1e-8,@isposscalar)
-p.addParameter('dBtol',1e-6,@isposscalar)
-p.addParameter('MaxIter',40,@isposintscalar)
+p.addParameter('drhotol',1e-6,@isposscalar)
+p.addParameter('MaxIterBar',60,@isposintscalar)
+p.addParameter('MaxIterHE',60,@isposintscalar)
 p.addParameter('verbosity',1,@isnonnegintscalar)
+p.addParameter('debug',false,@islogicalscalar)
 
 % Parse name-value pairs and return.
 p.parse(varargin{:})
@@ -48,14 +52,8 @@ function isnonnegintscalar(x)
 validateattributes(x,{'numeric'},{'nonnegative','integer','scalar'})
 end
 
-function TF = isvalidemail(x)
-if isempty(x), TF = true; return, end
-validateattributes(x,{'char'},{'row'})
-validemail='[a-z_.1-9]+@[a-z_.1-9]+\.(com|net|edu)';
-imatch=regexp(x,validemail);
-if isempty(imatch) || ~isscalar(imatch) || imatch > 1
-    error('Not a valid email address')
-end
+function islogicalscalar(x)
+validateattributes(x,{'logical'},{'scalar'})
 end
 
 function print_usage()
