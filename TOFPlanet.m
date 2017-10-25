@@ -9,23 +9,24 @@ classdef TOFPlanet < handle
     properties
         name   % model name
         mass   % reference mass
-        radius % reference radius
+        radius % reference radius (equatorial!)
         P0     % reference pressure
         si     % vector of mean radii, top down
         rhoi   % vector of densities on si grid
         mrot   % rotation parameter, w^2s0^3/GM
         eos    % barotrope(s) (tip: help barotropes for options)
-        opts   % holds user configurable options
+        opts   % holds user configurable options (tip: help tofset)
     end
     properties (SetAccess = private)
         ss     % shape functions (returned by tof4.m)
         SS     % shape functions (returned by tof4.m)
         Js     % external gravity coefficients (returned by tof4.m)
         betam  % mass renormalization factor (obj.mass/obj.M)
+        alfar  % radius renormalization factor (obj.radius/obj.a0)
     end
     properties (Dependent)
         M      % calculated mass
-        s0     % calculates mean radius
+        s0     % calculated mean radius (another name for obj.si(1))
         a0     % calculated equatorial radius
         rhobar % calculated mean density
         qrot   % rotation parameter referenced to a0
@@ -69,14 +70,6 @@ classdef TOFPlanet < handle
                 obj.u = setFUnits;
             end
             obj.G = obj.u.gravity;
-            
-            % Allocate memory for shape functions (totally unnecessary)
-%             ss.s0(N,1)=0; ss.s2(N,1)=0; ss.s4(N,1)=0; ss.s6(N,1)=0; ss.s8(N,1)=0;
-%             SS.S0(N,1)=0; SS.S2(N,1)=0; SS.S4(N,1)=0; SS.S6(N,1)=0; SS.S8(N,1)=0;
-%             SS.S0p=SS.S0; SS.S2p=SS.S2; SS.S4p=SS.S4; SS.S6p=SS.S6; SS.S8p=SS.S8;
-%             obj.ss = ss;
-%             obj.SS = SS;
-            
         end
     end % End of constructor block
     
@@ -116,14 +109,16 @@ classdef TOFPlanet < handle
                 old_ro = obj.rhoi;
                 obj.relax_to_HE();
                 obj.update_densities;
-                dJs = abs((obj.Js - old_Js)./obj.Js);
-                dro = max(abs(obj.rhoi - old_ro)./obj.rhoi);
+                dJs = abs((obj.Js - old_Js)./old_Js);
+                dJs = max(double(dJs(isfinite(dJs))));
+                dro = obj.rhoi./old_ro;
+                dro = var(double(dro(isfinite(dro))));
                 
                 if (verb > 0)
                     fprintf('Baropass %d (of max %d)...done. (%g sec)\n',...
                         iter, obj.opts.MaxIterBar, toc(t_pass))
-                    fprintf('drho = %g (%g required); dJ = %g (%g required).\n\n',...
-                        double(dro), obj.opts.drhotol, double(max(dJs)), obj.opts.dJtol)
+                    fprintf('var(drho) = %g (%g required); dJ = %g (%g required).\n\n',...
+                        dro, obj.opts.drhotol, dJs, obj.opts.dJtol)
                 end
                 
                 % The stopping criterion is to satisfy both J and rho tolerance
@@ -137,7 +132,8 @@ classdef TOFPlanet < handle
             ET = toc(t_rlx);
             
             % Renormalize densities, radii, Js.
-            obj.si = obj.si*obj.radius/obj.a0;
+            obj.alfar = obj.radius/obj.a0;
+            obj.si = obj.si*obj.alfar;
             obj.betam = obj.mass/obj.M;
             obj.rhoi = obj.rhoi*obj.betam;
             
@@ -227,15 +223,21 @@ classdef TOFPlanet < handle
                 case 'layerz'
                     drho = [obj.rhoi(1); diff(obj.rhoi)];
                     val = (4*pi/3)*sum(drho.*obj.si.^3);
-                case 'midpointz'
-                    rho = 0.5*(obj.rhoi(1:end-1) + obj.rhoi(2:end));
-                    rho(end+1) = 0.5*(obj.rhoi(end) + interp1(obj.si,obj.rhoi,0,'pchip'));
-                    s = 0.5*(obj.si(1:end-1) + obj.si(2:end));
-                    val = rho(end)*4*pi/3*obj.si(end)^3;
-                    val = val + 4*pi*sum(rho(1:end-1).*(s.^2).*(-diff(obj.si)));
+                case 'integralz'
+                    x = double(obj.si);
+                    v = double(obj.rhoi.*obj.si.^2);
+                    fun = @(z)interp1(x, v, z, 'pchip');
+                    val = 4*pi*integral(fun, 0 , x(1));
                 otherwise
                     error('Unknown mass calculation method.')
             end
+        end
+        
+        function beta = renormalize_density(obj)
+            beta = obj.mass/obj.M;
+            if abs(beta - 1) < 2*eps, return, end % don't renormalize a normal
+            obj.betam = beta;
+            obj.rhoi = obj.rhoi*beta;
         end
         
         function [ah, lh, gh] = plot_barotrope(obj, varargin)
@@ -297,16 +299,19 @@ classdef TOFPlanet < handle
             % Prepare the data: scaled input
             if pr.showscaledinput && ~isempty(obj.eos) && (range(x_tof) > 0)
                 x_bar = linspace(min(x_tof), max(x_tof));
-                bnorm = obj.betam;
+                bnorm = obj.betam; % the mass renorm factor
+                anorm = obj.alfar; % the radius renorm factor
+                if isempty(bnorm), bnorm = nan; end
+                if isempty(anorm), anorm = nan; end
                 if isscalar(obj.eos)
-                    y_bar_scl = double(bnorm^2*obj.eos.pressure(x_bar/bnorm));
+                    y_bar_scl = double(bnorm/anorm*obj.eos.pressure(x_bar/bnorm));
                 else
                     v = 1:length(unique(x_tof));
                     ind = interp1(unique(x_tof), v, x_bar, 'nearest', 'extrap');
                     y_bar_scl = nan(size(x_bar));
                     for k=1:length(x_bar)
                         y_bar_scl(k) = double(...
-                            bnorm^2*obj.eos(ind(k)).pressure(x_bar(k)/bnorm));
+                            bnorm/anorm*obj.eos(ind(k)).pressure(x_bar(k)/bnorm));
                     end
                 end
             else
@@ -336,7 +341,7 @@ classdef TOFPlanet < handle
                 lh(end+1) = line(x_bar, y_bar_scl/1e9);
                 lh(end).Color = [0, 0.5, 0];
                 lh(end).LineStyle = '--';
-                lh(end).DisplayName = 'input barotrope ($\beta$-scaled)';
+                lh(end).DisplayName = 'input barotrope ($\frac{\beta}{\alpha}$-scaled)';
             end
             
             % Style and annotate axes
@@ -361,6 +366,38 @@ classdef TOFPlanet < handle
     
     %% Private methods
     methods (Access = private)
+        function y = P_ref(obj)
+            U = obj.G*obj.mass/obj.s0^3*obj.si.^2.*obj.Upu();
+            rho = 0.5*(obj.rhoi(1:end-1) + obj.rhoi(2:end));
+            y = zeros(obj.N, 1)*rho(1)*U(1);
+            y(1) = obj.P0;
+            y(2:end) = y(1) + cumsum(-rho.*diff(U));
+        end
+        function y = P_mid(obj)
+            % Pressure interpolated to halfway between level surfaces.
+            
+            v = double(obj.Pi);
+            if isempty(v), y = []; return, end
+            x = double(obj.si);
+            xq = [(x(1:end-1) + x(2:end))/2; x(end)/2];
+            y = interp1(x, v, xq, 'pchip')*obj.u.Pa;
+        end
+        function y = Upu(obj)
+            % Following Nettelmann 2017 eqs. B3 and B.4, assuming equipotential.
+            s2 = obj.ss.s2;
+            s4 = obj.ss.s4;
+            A0(obj.N,1) = 0;
+            A0 = A0 + obj.SS.S0.*(1 + 2/5*s2.^2 - 4/105*s2.^3 + 2/9*s4.^2 + ...
+                43/175*s2.^4 - 4/35*s2.^2.*s4);
+            A0 = A0 + obj.SS.S2.*(-3/5*s2 + 12/35*s2.^2 - 234/175*s2.^3 + 24/35*s2.*s4);
+            A0 = A0 + obj.SS.S4.*(-5/9*s4 + 6/7*s2.^2);
+            A0 = A0 + obj.SS.S0p.*(1);
+            A0 = A0 + obj.SS.S2p.*(2/5*s2 + 2/35*s2.^2 + 4/35*s2.*s4 - 2/25*s2.^3);
+            A0 = A0 + obj.SS.S4p.*(4/9*s4 + 12/35*s2.^2);
+            A0 = A0 + obj.mrot/3*(1 - 2/5*s2 - 9/35*s2.^2 - 4/35*s2.*s4 + 22/525*s2.^3);
+            
+            y = -A0;
+        end
     end % End of private methods block
     
     %% Access methods
@@ -381,9 +418,9 @@ classdef TOFPlanet < handle
             A0 = A0 + obj.SS.S4p.*(4/9*s4 + 12/35*s2.^2);
             A0 = A0 + obj.mrot/3*(1 - 2/5*s2 - 9/35*s2.^2 - 4/35*s2.*s4 + 22/525*s2.^3);
             
-            val = -4*pi/3*obj.G*obj.rhobar*obj.si.^2.*A0;
+            val = -obj.G*obj.mass/obj.s0^3*obj.si.^2.*A0;
         end
-        
+                
         function val = get.Pi(obj)
             if isempty(obj.Ui) || isempty(obj.rhoi) || isempty(obj.P0)
                 val = [];
@@ -411,7 +448,7 @@ classdef TOFPlanet < handle
             if isempty(obj.si) || isempty(obj.rhoi)
                 val = [];
             else
-                val = obj.total_mass();
+                val = obj.total_mass(obj.opts.masmeth);
             end
         end
         

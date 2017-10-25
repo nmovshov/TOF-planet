@@ -33,6 +33,7 @@ p.addParameter('MaxIterBar',60,@isposintscalar)
 p.addParameter('MaxIterHE',60,@isposintscalar)
 p.addParameter('verbosity',1,@isnonnegintscalar)
 p.addParameter('debug',false,@islogicalscalar)
+p.addParameter('masmeth','layerz');
 
 % Parse name-value pairs and return.
 p.parse(varargin{:})

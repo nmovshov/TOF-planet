@@ -70,7 +70,7 @@ end
 
 function fs = B1617(ss)
 % Nettelmann 2017 eqs. B.16 and B.17.
-s0 = ss.s0; s2 = ss.s2; s4 = ss.s4; s6 = ss.s6; s8 = ss.s8;
+s0 = ss.s0; s2 = ss.s2; s4 = ss.s4; s6 = ss.s6; s8 = ss.s8; %#ok<NASGU>
 
 fs.f0 = ones(size(ss.s0));
 
@@ -107,6 +107,20 @@ function SS = B9(Z, D, fs)
 % Nettelmann 2017 eq. B.9.
 
 N = length(Z); % x(N) is faster than x(end)
+
+% m = nan(N,1);
+% fun = @(z)interp1(Z, D.*Z.^2, z, 'pchip');
+% for k=1:N
+%     m(k) = integral(fun,0,Z(k));
+% end
+% m = 4*pi*m;
+%
+% m(1) = 4*pi/3*D(1)*Z(1)^3;
+% for k=2:N
+%     m(k) = m(k-1) + 4*pi/3*D(k)*(Z(k)^3 - Z(k-1)^3);
+% end
+% 
+% SS.S0 = m./(m(N)*Z.^3);
 
 I0 = cumtrapz(D, Z.^(0+3).*fs.f0);
 SS.S0 = D.*fs.f0 - Z.^-(0+3).*I0;
@@ -169,7 +183,7 @@ function A = B1215(s, S, Sp, m)
 
 s2 = s(1); s4 = s(2); s6 = s(3); s8 = s(4);
 S0 = S(1); S2 = S(2); S4 = S(3); S6 = S(4); S8 = S(5);
-S0p = Sp(1); S2p = Sp(2); S4p = Sp(3); S6p = Sp(4); S8p = Sp(5);
+S0p = Sp(1); S2p = Sp(2); S4p = Sp(3); S6p = Sp(4); S8p = Sp(5); %#ok<NASGU>
 
 % B.12
 A2 = 0;

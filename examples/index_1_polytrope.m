@@ -38,6 +38,7 @@ tof.radius = R;
 tof.si = R*linspace(1, 1/N, N)'; % will be renormalized
 tof.rhoi = ones(N,1)*M/(4*pi/3*R^3); % will be renormalized
 tof.mrot = 0.083432862292087;
+tof.P0 = 0*u.bar; % added to surface pressure
 
 %% Construct a polytrope of index 1 to represent the planet's eos
 n = 1;
@@ -45,9 +46,8 @@ K = 2*G/pi*R^2; % ...matches radius just for show, K has no effect on the Js
 eos = barotropes.Polytrope(K, n);
 eos.name = '$P\propto\rho^2$';
 tof.eos = eos;
-tof.P0 = 1*u.bar; % added to surface pressure
 
-%% To speed up convergence start with an approximate density structure
+%% To (barely) speed up convergence start with an approximate density structure
 a = sqrt(2*pi*G/K);
 r = pi/a;
 rho_av = 3*M/(4*pi*r^3);
@@ -57,7 +57,9 @@ x(end+1) = tof.si(end)/2;
 tof.rhoi = rho_c*sin(a*x)./(a*x);
 
 %% Relax to desired barotrope
-tof.opts.MaxIterBar = 10;
+tof.opts.drhotol = 1e-5;
+tof.opts.dJtol = 1e-6;
+tof.opts.MaxIterBar = 30;
 tof.relax_to_barotrope;
 
 %% Compare computed and analytic density structure
@@ -85,8 +87,13 @@ format long
 format compact
 disp(T)
 format
+format compact
+J2_err = (tof.J2*1e2 - H13_512(2))/(tof.J2*1e2)
+J4_err = (-tof.J4*1e4 - H13_512(3))/(-tof.J4*1e4)
+J6_err = (1e5*tof.J6 - H13_512(4))/(tof.J6*1e5)
+format
 try
-    tof.plot_equipotential_surfaces;
+    %tof.plot_equipotential_surfaces;
     tof.plot_barotrope('showinput',true,'showscaledinput',true);
 catch
 end

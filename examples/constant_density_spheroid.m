@@ -53,6 +53,7 @@ tof = TOFPlanet(N);
 tof.si = linspace(1,1/N,N)';
 tof.rhoi = ones(N,1);
 tof.mrot = m;
+tof.opts.verbosity = 2;
 tof.relax_to_HE();
 
 %% Take a quick look for sanity check

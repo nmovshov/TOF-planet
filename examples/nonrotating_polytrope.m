@@ -30,7 +30,7 @@
 clear
 clc
 close all
-debug = false;
+debug = true;
 if debug
     u = setUnits;
 else
@@ -43,7 +43,7 @@ M = 317.8*u.earth_mass;
 R = 71492*u.km;
 
 %#ok<*SAGROW>
-N = [1024];
+N = [128,256,512];
 for k=1:length(N)
     tof(k) = TOFPlanet(N(k), 'debug', debug);
     tof(k).name = ['TOF',int2str(N(k))];
@@ -69,6 +69,8 @@ eos.name = sprintf('$P\\propto\\rho^2$');
 %% Relax to desired barotrope
 for k=1:length(N)
     tof(k).opts.verbosity = 1;
+    tof(k).opts.dJtol = 1e-6;
+    tof(k).opts.drhotol = 1e-6;
     tof(k).opts.MaxIterBar = 20; % default 40
     tof(k).relax_to_barotrope;
 end
