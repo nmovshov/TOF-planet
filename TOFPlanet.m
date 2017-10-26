@@ -355,6 +355,64 @@ classdef TOFPlanet < handle
             gh.FontSize = 11;
             
         end
+        
+        function [ah, lh] = plot_equipotential_surfaces(obj)
+            % Visualize a TOFPlanet object by plotting equipotential contours.
+            
+            % Require R2016a to use the amazing polarplot features
+            if verLessThan('matlab','9')
+                warning('Equipotential plots require R2016a or later')
+                return
+            end
+            
+            % Work on converged objects only
+            if isempty(obj.Js)
+                warning('There are no equipotentials. Did you run tof.relax_to_HE() yet?')
+                return
+            end
+            
+            % Prepare polar axes
+            figure;
+            ah = polaraxes;
+            ah.ThetaZeroLocation = 'top';
+            ah.ThetaDir = 'clockwise';
+            ah.ThetaAxisUnits = 'rad';
+            hold(ah, 'on')
+            
+            % Plot level surfaces colored by layer density
+            cmap = parula;
+            rho = obj.rhoi;
+            romin = min(rho); romax = max(rho);
+            lh = gobjects(size(obj.si));
+            for k=1:obj.N
+                th = linspace(0,2*pi,60);
+                xi = obj.level_surface(obj.si(k)/obj.s0, th);
+                lh(k) = polarplot(ah, th, xi);
+                lh(k).Tag = 'equisurface';
+                if (rho(k) <= romin)
+                    ci = 1;
+                elseif (rho(k) >= romax)
+                    ci = length(cmap);
+                else
+                    ci = fix((rho(k) - romin)/(romax - romin)*length(cmap)) + 1;
+                end
+                lh(k).Color = cmap(ci,:);
+            end
+            
+            % Make outer surface more distinct
+            lh(1).LineWidth = 2;
+            lh(1).Color = 'k';
+            
+            % Show grid lines above contours
+            ah.Layer = 'top';
+            
+            % Add a colorbar
+            ch = colorbar;
+            ch.Label.String =...
+                sprintf('\\times %.0f kg/m^3', double(max(obj.rhoi)));
+            ch.Label.FontSize = 10;
+        end
+        
     end % End of public methods block
     
     %% Private (or obsolete) methods
