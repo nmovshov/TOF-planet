@@ -214,30 +214,23 @@ classdef TOFPlanet < handle
             r = obj.si(k)*(1 + shp);
         end
         
-        function val = total_mass(obj,method)
+        function m = total_mass(obj,method)
             if nargin == 1, method = 'layerz'; end
             switch lower(method)
                 case 'trapz'
-                    val = -4*pi*trapz(double(obj.si), double(obj.rhoi.*obj.si.^2));
-                    val = val*obj.u.kg;
+                    m = -4*pi*trapz(double(obj.si), double(obj.rhoi.*obj.si.^2));
+                    m = m*obj.u.kg;
                 case 'layerz'
                     drho = [obj.rhoi(1); diff(obj.rhoi)];
-                    val = (4*pi/3)*sum(drho.*obj.si.^3);
+                    m = (4*pi/3)*sum(drho.*obj.si.^3);
                 case 'integralz'
                     x = double(obj.si);
                     v = double(obj.rhoi.*obj.si.^2);
                     fun = @(z)interp1(x, v, z, 'pchip');
-                    val = 4*pi*integral(fun, 0 , x(1));
+                    m = 4*pi*integral(fun, 0 , x(1));
                 otherwise
                     error('Unknown mass calculation method.')
             end
-        end
-        
-        function beta = renormalize_density(obj)
-            beta = obj.mass/obj.M;
-            if abs(beta - 1) < 2*eps, return, end % don't renormalize a normal
-            obj.betam = beta;
-            obj.rhoi = obj.rhoi*beta;
         end
         
         function [ah, lh, gh] = plot_barotrope(obj, varargin)
@@ -364,8 +357,14 @@ classdef TOFPlanet < handle
         end
     end % End of public methods block
     
-    %% Private methods
+    %% Private (or obsolete) methods
     methods (Access = private)
+        function beta = renormalize_density(obj)
+            beta = obj.mass/obj.M;
+            if abs(beta - 1) < 2*eps, return, end % don't renormalize a normal
+            obj.betam = beta;
+            obj.rhoi = obj.rhoi*beta;
+        end
         function y = P_ref(obj)
             U = obj.G*obj.mass/obj.s0^3*obj.si.^2.*obj.Upu();
             rho = 0.5*(obj.rhoi(1:end-1) + obj.rhoi(2:end));
@@ -441,6 +440,8 @@ classdef TOFPlanet < handle
             if ~isa(val,'barotropes.Barotrope')
                 error('eos must be a valid instance of class Barotrope')
             end
+            assert(numel(val)==1 || numel(val)==obj.N,...
+                'eos must be scalar or same length as radius grid.')
             obj.eos = val(:);
         end
         
