@@ -26,6 +26,7 @@ classdef TOFPlanet < handle
     end
     properties (Dependent)
         M      % calculated mass
+        mi     % cumulative mass below si
         s0     % calculated mean radius (another name for obj.si(1))
         a0     % calculated equatorial radius
         rhobar % calculated mean density
@@ -230,6 +231,70 @@ classdef TOFPlanet < handle
                     m = 4*pi*integral(fun, 0 , x(1));
                 otherwise
                     error('Unknown mass calculation method.')
+            end
+        end
+        
+        function mcore = core_mass(obj, bypeaks)
+            % Return estimated core mass.
+            
+            if nargin < 2, bypeaks = false; end
+            
+            if isempty(obj.eos) || isscalar(obj.eos) || bypeaks
+                % Define core using a density jump
+                dvec = double(obj.rhoi/obj.rhobar)';
+                deltas = [dvec(1), diff(dvec)];
+                cind = peakfinder(deltas);
+                mcore = obj.mi(cind(end));
+            else
+                % Define core as innermost contiguous block of same eos
+                alleos = obj.eos;
+                if isequal(alleos(1), barotropes.ConstDensity(0))
+                    zlay = true;
+                    alleos(1) = [];
+                else
+                    zlay = false;
+                end
+                ind = arrayfun(@isequal, alleos,...
+                    repmat(alleos(end), numel(alleos), 1));
+                cind = find(~ind, 1, 'last') + 1;
+                if isempty(cind)
+                    mcore = 0;
+                else
+                    if zlay, cind = cind + 1; end
+                    mcore = obj.mi(cind);
+                end
+            end
+        end
+        
+        function rcore = core_radius(obj, bypeaks)
+            % Return estimated core radius.
+            
+            if nargin < 2, bypeaks = false; end
+            
+            if isempty(obj.eos) || isscalar(obj.eos) || bypeaks
+                % Define core using a density jump
+                dvec = double(obj.rhoi/obj.rhobar)';
+                deltas = [dvec(1), diff(dvec)];
+                cind = peakfinder(deltas);
+                rcore = obj.si(cind(end));
+            else
+                % Define core as innermost contiguous block of same eos
+                alleos = obj.eos;
+                if isequal(alleos(1), barotropes.ConstDensity(0))
+                    zlay = true;
+                    alleos(1) = [];
+                else
+                    zlay = false;
+                end
+                ind = arrayfun(@isequal, alleos,...
+                    repmat(alleos(end), numel(alleos), 1));
+                cind = find(~ind, 1, 'last') + 1;
+                if isempty(cind)
+                    rcore = 0;
+                else
+                    if zlay, cind = cind + 1; end
+                    rcore = obj.si(cind);
+                end
             end
         end
         
@@ -508,6 +573,21 @@ classdef TOFPlanet < handle
                 val = [];
             else
                 val = obj.total_mass(obj.opts.masmeth);
+            end
+        end
+        
+        function val = get.mi(obj)
+            % mass _below_ level i
+            if isempty(obj.si) || isempty(obj.rhoi)
+                val = [];
+            else
+                rho = obj.rhoi;
+                s = obj.si;
+                val(obj.N) = 4*pi/3*rho(obj.N)*s(obj.N)^3;
+                for k=obj.N-1:-1:1
+                    val(k) = val(k+1) + 4*pi/3*rho(k)*(s(k)^3 - s(k+1)^3);
+                end
+                val = val';
             end
         end
         
