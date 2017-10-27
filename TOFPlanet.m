@@ -31,6 +31,7 @@ classdef TOFPlanet < handle
         a0     % calculated equatorial radius
         rhobar % calculated mean density
         qrot   % rotation parameter referenced to a0
+        NMoI   % normalized moment of inertia
         Ui     % gravitational potential on grid
         Pi     % hydrostatic pressure on grid
         J2     % convenience alias to obj.Js(2)
@@ -751,6 +752,20 @@ classdef TOFPlanet < handle
                 val = [];
             else
                 val = obj.aos*obj.s0;
+            end
+        end
+        
+        function val = get.NMoI(obj)
+            if isempty(obj.rhobar)
+                val = [];
+            else
+                rho = obj.rhoi;
+                s = obj.si;
+                for k=1:obj.N-1
+                    m = 4*pi/3*rho(k)*(s(k)^3 - s(k+1)^3);
+                    I(k) = 2/5*m*(s(k)^5 - s(k+1)^5)/(s(k)^3 - s(k+1)^3);
+                end
+                val = sum(I)/(obj.M*obj.s0^2);
             end
         end
         

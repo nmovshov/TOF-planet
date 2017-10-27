@@ -48,7 +48,7 @@ catch
 end
 
 %% Now set up a TOFPlanet to mimic constant density case
-N = 2; % can be any number though!
+N = 12; % can be any number though!
 tof = TOFPlanet(N);
 tof.si = linspace(1,1/N,N)';
 tof.rhoi = ones(N,1);
