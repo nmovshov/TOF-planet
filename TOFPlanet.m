@@ -614,6 +614,103 @@ classdef TOFPlanet < handle
             gh = legend(ah, 'show','location','ne');
             gh.FontSize = 11;
         end
+        
+        function s = to_struct(obj, rdc)
+            % Convert object to static struct keeping only essential fields.
+            
+            if nargin < 2, rdc = 1; end % 0=none, 1=to double, 2=to single
+            
+            s.name = obj.name;
+            s.M      = obj.M;
+            s.s0     = obj.s0;
+            s.a0     = obj.a0;
+            s.M_core = obj.core_mass;
+            s.R_core = obj.core_radius;
+            s.mrot   = obj.mrot;
+            s.qrot   = obj.qrot;
+            s.J2     = obj.J2;
+            s.J4     = obj.J4;
+            s.J6     = obj.J6;
+            s.J8     = obj.J8;
+            s.NMoI   = obj.NMoI;
+            s.si     = obj.si;
+            s.Pi     = obj.Pi;
+            s.mi     = obj.mi;
+            
+            if rdc == 1
+                s = structfun(@double, s, 'UniformOutput', false);
+            end
+            if rdc == 2
+                s = structfun(@single, s, 'UniformOutput', false);
+            end
+        end
+        
+        function T = to_table(obj)
+            % Create table of the grid quantities.
+            
+            T = table;
+            T.si = double(obj.si);
+            T.rhoi = double(obj.rhoi);
+            T.Pi = double(obj.Pi);
+            T.mi = double(obj.mi);
+        end
+        
+        function to_ascii(obj, fname)
+            % Export the state of the model as ascii file.
+            
+            % File name
+            if nargin == 1, fname = obj.name; end
+            if isempty(fname), fname = 'model1.txt'; end
+            validateattributes(fname, {'char'}, {'row'}, '', 'fname', 1)
+            
+            % Open file
+            fid = fopen(fname,'wt');
+            cleanup = onCleanup(@()fclose(fid));
+            
+            % Write the header
+            fprintf(fid,'# Rotating fluid planet modeled 4th-order Theory of Figures.\n');
+            fprintf(fid,'#\n');
+            fprintf(fid,'# Model name: %s\n', obj.name);
+            fprintf(fid,'#\n');
+            fprintf(fid,'# Scalar quantities:\n');
+            fprintf(fid,'# N layers = %d\n',obj.N);
+            fprintf(fid,'# Mass M = %g kg\n', double(obj.M));
+            fprintf(fid,'# Mean radius       s0 = %0.6e m\n', double(obj.s0));
+            fprintf(fid,'# Equatorial radius a0 = %0.6e m\n', double(obj.a0));
+            fprintf(fid,'# Rotation parameter m = %0.6f\n', double(obj.mrot));
+            fprintf(fid,'# Rotation parameter q = %0.6f\n', double(obj.qrot));
+            fprintf(fid,'# Core mass fraction M_core/M = %g\n', ...
+                double(obj.core_mass)/double(obj.M));
+            fprintf(fid,'#\n');
+            fprintf(fid,'# Calculated gravity zonal harmonics (x 10^6):\n');
+            fprintf(fid,'# J2  = %12.6f\n', obj.J2*1e6);
+            fprintf(fid,'# J4  = %12.6f\n', obj.J4*1e6);
+            fprintf(fid,'# J6  = %12.6f\n', obj.J6*1e6);
+            fprintf(fid,'# J8  = %12.6f\n', obj.J8*1e6);
+            fprintf(fid,'#\n');
+            fprintf(fid,'# Column data description (MKS):\n');
+            fprintf(fid,'# i     - level surface index (increasing with depth)\n');
+            fprintf(fid,'# s_i   - mean radius of level surface i\n');
+            fprintf(fid,'# rho_i - density on level surfaces i\n');
+            fprintf(fid,'# P_i   - pressure on level surface i\n');
+            fprintf(fid,'# m_i   - mass below level surface i\n');
+            fprintf(fid,'#\n');
+            
+            % Write the data
+            fprintf(fid,'# Column data:\n');
+            fprintf(fid,'# %-4s  ','i');
+            fprintf(fid,'%-10s  ','s_i');
+            fprintf(fid,'%-7s  ','rho_i');
+            fprintf(fid,'%-10s  ','P_i','m_i');
+            fprintf(fid,'\n');
+            for k=1:obj.N
+                fprintf(fid,'  %-4d  ',k);
+                fprintf(fid,'%10.4e  ', double(obj.si(k)));
+                fprintf(fid,'%7.1f  ', double(obj.rhoi(k)));
+                fprintf(fid,'%10.4e  ', double(obj.Pi(k)), double(obj.mi(k)));
+                fprintf(fid,'\n');
+            end
+        end
     end % End of public methods block
     
     %% Private (or obsolete) methods
@@ -660,6 +757,13 @@ classdef TOFPlanet < handle
     
     %% Access methods
     methods
+        function set.name(obj,val)
+            if ~isempty(val)
+                validateattributes(val, {'char'}, {'row'})
+            end
+            obj.name = val;
+        end
+        
         function val = get.Ui(obj)
             % Following Nettelmann 2017 eqs. B3 and B.4, assuming equipotential.
             if isempty(obj.ss), val = []; return, end
