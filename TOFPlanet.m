@@ -27,6 +27,7 @@ classdef TOFPlanet < handle
     properties (Dependent)
         M      % calculated mass
         mi     % cumulative mass below si
+        M_core % estimated core mass
         s0     % calculated mean radius (another name for obj.si(1))
         a0     % calculated equatorial radius
         rhobar % calculated mean density
@@ -615,6 +616,76 @@ classdef TOFPlanet < handle
             gh.FontSize = 11;
         end
         
+        function T = report_card(obj, obs)
+            % REPORT_CARD Table summary of model's vital statistics.
+            
+            % Minimal checks
+            narginchk(1,2);
+            try
+                obj.J2;
+            catch
+                warning('Uncooked object.')
+                return
+            end
+            
+            % Basic table
+            vitals = {'Mass [kg]'; 'J2'; 'J4'; 'J6'; 'J8'; 'NMoI'; '"core" mass [kg]'};
+            TOF1 = [obj.M; obj.J2; obj.J4; obj.J6; obj.J8; obj.NMoI; obj.core_mass()];
+            TOF1 = double(TOF1);
+            T = table(TOF1, 'RowNames', vitals);
+            if ~isempty(obj.name)
+                vname = matlab.lang.makeValidName(obj.name);
+                T.Properties.VariableNames{'TOF1'} = vname;
+            end
+            if nargin == 1, return, end
+            
+            % Optionally compare with something
+            try
+                oM = obs.M;
+            catch
+                oM = NaN;
+            end
+            try
+                oJ2 = obs.J2;
+                oJ4 = obs.J4;
+                oJ6 = obs.J6;
+                oJ8 = obs.J8;
+            catch
+                oJ2 = NaN;
+                oJ4 = NaN;
+                oJ6 = NaN;
+                oJ8 = NaN;
+            end
+            try
+                oNMoI = obs.NMoI;
+            catch
+                oNMoI = NaN;
+            end
+            try
+                oM_core = obs.M_core;
+            catch
+                oM_core = NaN;
+            end
+            try
+                oname = obs.name;
+            catch
+                oname = [];
+            end
+            OBS1 = [oM; oJ2; oJ4; oJ6; oJ8; oNMoI; oM_core];
+            OBS1 = double(OBS1);
+            T = [T table(OBS1)];
+            if ~isempty(oname)
+                vname = matlab.lang.makeValidName(obs.name);
+                try
+                    T.Properties.VariableNames{'OBS1'} = vname;
+                catch
+                    T.Properties.VariableNames{'OBS1'} = ['x_',vname];
+                end
+            end
+            DIFF = (TOF1 - OBS1)./TOF1;
+            T = [T table(DIFF, 'VariableNames', {'diff'})];
+        end
+        
         function s = to_struct(obj, rdc)
             % Convert object to static struct keeping only essential fields.
             
@@ -828,6 +899,14 @@ classdef TOFPlanet < handle
                     val(k) = val(k+1) + 4*pi/3*rho(k)*(s(k)^3 - s(k+1)^3);
                 end
                 val = val';
+            end
+        end
+        
+        function val = get.M_core(obj)
+            try
+                val = obj.core_mass;
+            catch
+                val = [];
             end
         end
         
