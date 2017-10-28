@@ -835,6 +835,19 @@ classdef TOFPlanet < handle
             obj.name = val;
         end
         
+        function set.si(obj, val)
+            assert(isnumeric(val) && isvector(val) && ~any(val<0),...
+                'obj.si must be a nonnegative vector.')
+            assert(all(diff(val)<=0),'obj.si must be non-ascending.')
+            obj.si = val(:);
+        end
+        
+        function set.rhoi(obj, val)
+            assert(isnumeric(val) && isvector(val) && ~any(val<0),...
+                'obj.rhoi must be a nonnegative vector.')
+            obj.rhoi = val(:);
+        end
+        
         function val = get.Ui(obj)
             % Following Nettelmann 2017 eqs. B3 and B.4, assuming equipotential.
             if isempty(obj.ss), val = []; return, end
