@@ -18,6 +18,7 @@ classdef TOFPlanet < handle
         opts   % holds user configurable options (tip: help tofset)
     end
     properties (SetAccess = private)
+        N      % convenience name for length(obj.si)
         ss     % shape functions (returned by tof4.m)
         SS     % shape functions (returned by tof4.m)
         Js     % external gravity coefficients (returned by tof4.m)
@@ -41,31 +42,21 @@ classdef TOFPlanet < handle
         J8     % convenience alias to obj.Js(5)
     end
     properties (GetAccess = private)
-        aos;   % calculated equatorial to mean radius ratio (from tof4.m)
-        N;     % convenience name for length(obj.si)
-        G;     % Gravitational constant
-        u;     % let's hold a units struct for convenience
+        aos    % calculated equatorial to mean radius ratio (from tof4.m)
+        G      % Gravitational constant
+        u      % let's hold a units struct for convenience
     end
     
     %% A simple constructor
     methods
-        function obj = TOFPlanet(N, varargin)
+        function obj = TOFPlanet(varargin)
             % A simple constructor of TOFPlanet objects.
             % TOFPlanet(N, 'OPTION1', VALUE, 'OPTION2', VALUE2,...)
-            
-            % The grid size is required
-            if nargin == 0
-                error(['Required argument missing: specify number of radius',...
-                    ' grid points as first input argument.'])
-            end
-            validateattributes(N,{'numeric'},{'positive','integer','scalar'},...
-                '','N',1)
             
             % Populate options struct
             obj.opts = tofset(varargin{:});
             
             % Init privates
-            obj.N = N;
             obj.aos = [];
             if obj.opts.debug
                 obj.u = setUnits;
@@ -928,6 +919,17 @@ classdef TOFPlanet < handle
                 val = [];
             else
                 val = obj.si(1);
+            end
+        end
+        
+        function val = get.N(obj)
+            if isempty(obj.si) || isempty(obj.rhoi)
+                val = 0;
+            elseif length(obj.si) == length(obj.rhoi)
+                val = length(obj.si);
+            else
+                error('length(si) = %g ~= length(rhoi) = %g',...
+                    length(obj.si),length(obj.rhoi))
             end
         end
         

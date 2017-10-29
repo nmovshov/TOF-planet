@@ -49,7 +49,7 @@ end
 
 %% Now set up a TOFPlanet to mimic constant density case
 N = 12; % can be any number though!
-tof = TOFPlanet(N);
+tof = TOFPlanet();
 tof.si = linspace(1,1/N,N)';
 tof.rhoi = ones(N,1);
 tof.mrot = m;

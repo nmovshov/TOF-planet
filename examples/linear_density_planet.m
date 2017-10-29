@@ -13,7 +13,7 @@ close all
 
 %% Set up a TOF object and give it a density profile linear in mean radii
 N = 24;
-tof = TOFPlanet(N);
+tof = TOFPlanet();
 tof.si = linspace(1, 1/N, N)';
 dl = 1/(N-1);
 tof.rhoi = [0:dl:1]';

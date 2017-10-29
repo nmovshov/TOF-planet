@@ -45,7 +45,7 @@ R = 71492*u.km;
 %#ok<*SAGROW>
 N = [128,256,512];
 for k=1:length(N)
-    tof(k) = TOFPlanet(N(k), 'debug', debug);
+    tof(k) = TOFPlanet('debug', debug);
     tof(k).name = ['TOF',int2str(N(k))];
     tof(k).mass = M;
     tof(k).radius = R;
