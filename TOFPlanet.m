@@ -29,6 +29,7 @@ classdef TOFPlanet < handle
         M      % calculated mass
         mi     % cumulative mass below si
         M_core % estimated core mass
+        R_core % estimated core radius
         s0     % calculated mean radius (another name for obj.si(1))
         a0     % calculated equatorial radius
         rhobar % calculated mean density
@@ -57,7 +58,7 @@ classdef TOFPlanet < handle
             obj.opts = tofset(varargin{:});
             
             % Init privates
-            obj.aos = [];
+            obj.aos = 1;
             if obj.opts.debug
                 obj.u = setUnits;
             else
@@ -125,7 +126,7 @@ classdef TOFPlanet < handle
             end
             ET = toc(t_rlx);
             
-            % Renormalize densities, radii, Js.
+            % Renormalize densities, radii.
             obj.alfar = obj.radius/obj.a0;
             obj.si = obj.si*obj.alfar;
             obj.betam = obj.mass/obj.M;
@@ -190,6 +191,23 @@ classdef TOFPlanet < handle
                 fprintf('done.\n')
             end
             obj.rhoi = newro;
+        end
+        
+        function ab = renormalize(obj)
+            % Match input and calculated mass and equatorial radius.
+            try
+                a = obj.radius/obj.a0;
+                obj.si = obj.si*a;
+            catch
+                a = [];
+            end
+            try
+                b = obj.mass/obj.M;
+                obj.rhoi = obj.rhoi*b;
+            catch
+                b = [];
+            end
+            ab = [a, b];
         end
         
         function r = level_surface(obj, el, theta)
@@ -878,8 +896,8 @@ classdef TOFPlanet < handle
             if ~isa(val,'barotropes.Barotrope')
                 error('eos must be a valid instance of class Barotrope')
             end
-            assert(numel(val)==1 || numel(val)==obj.N,...
-                'eos must be scalar or same length as radius grid.')
+%             assert(numel(val)==1 || numel(val)==obj.N,...
+%                 'eos must be scalar or same length as radius grid.')
             obj.eos = val(:);
         end
         
@@ -889,6 +907,16 @@ classdef TOFPlanet < handle
             else
                 val = obj.total_mass(obj.opts.masmeth);
             end
+        end
+        
+        function set.mass(obj,val)
+            validateattributes(val,{'numeric'},{'positive','scalar'})
+            obj.mass = val;
+        end
+        
+        function set.radius(obj,val)
+            validateattributes(val,{'numeric'},{'positive','scalar'})
+            obj.radius = val;
         end
         
         function val = get.mi(obj)
@@ -909,6 +937,14 @@ classdef TOFPlanet < handle
         function val = get.M_core(obj)
             try
                 val = obj.core_mass;
+            catch
+                val = [];
+            end
+        end
+        
+        function val = get.R_core(obj)
+            try
+                val = obj.core_radius;
             catch
                 val = [];
             end
