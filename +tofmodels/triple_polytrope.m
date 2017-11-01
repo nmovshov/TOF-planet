@@ -19,7 +19,7 @@ try
     assert(x(8) > 0 && x(8) < 1, 'Second transition radius must be in (0,1).')
     assert(x(8) < x(7), 'Second transition must come before first transition.')
 catch ME
-    help('models.triple_polytrope')
+    help('tofmodels.triple_polytrope')
     rethrow(ME)
 end
 

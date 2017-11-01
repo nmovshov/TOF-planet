@@ -9,7 +9,7 @@ try
     validateattributes(N, {'numeric'}, {'positive', 'integer'}, '', 'N', 1)
     validateattributes(x, {'numeric'}, {'vector', 'numel', 2, 'nonnegative'}, 2)
 catch ME
-    help('models.single_polytrope')
+    help('tofmodels.single_polytrope')
     rethrow(ME)
 end
 

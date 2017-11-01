@@ -25,7 +25,7 @@ try
         assert(length(svec) == length(rhovec), 'length(svec) ~= length(rhovec)')
     end
 catch ME
-    help('models.rhoofs')
+    help('tofmodels.rhoofs')
     rethrow(ME)
 end
 
