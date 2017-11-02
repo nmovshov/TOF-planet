@@ -148,11 +148,11 @@ classdef TOFPlanet < handle
                 fprintf('  Relaxing to hydrostatic equilibrium...\n')
             end
             
-            tic
+            t_rlx = tic;
             zvec = double(obj.si/obj.si(1));
             dvec = double(obj.rhoi/obj.rhobar);
             [obj.Js, out] = tof4(zvec, dvec, obj.mrot, obj.opts.dJtol, obj.opts.MaxIterHE);
-            ET = toc;
+            ET = toc(t_rlx);
             dJ = out.dJs;
             obj.ss = structfun(@flipud, out.ss, 'UniformOutput', false);
             obj.SS = structfun(@flipud, out.SS, 'UniformOutput', false);
