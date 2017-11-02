@@ -74,11 +74,13 @@ classdef TOFPlanet < handle
             % Relax equilibrium shape functions, Js, and density simultaneously.
             
             if isempty(obj.eos)
-                warning('Set valid barotrope first (<obj>.eos = <barotrope>)')
+                warning('TOFPLANET:assertion',...
+                    'Set valid barotrope first (<obj>.eos = <barotrope>)')
                 return
             end
             if isempty(obj.P0)
-                warning('Setting reference pressure to zero (<obj>.P0=0).')
+                warning('TOFPLANET:P0',...
+                    'Setting reference pressure to zero (<obj>.P0=0).')
                 obj.P0 = 0*obj.u.bar;
             end
             
@@ -714,6 +716,7 @@ classdef TOFPlanet < handle
             s.J8     = obj.J8;
             s.NMoI   = obj.NMoI;
             s.si     = obj.si;
+            s.rhoi   = obj.rhoi;
             s.Pi     = obj.Pi;
             s.mi     = obj.mi;
             
