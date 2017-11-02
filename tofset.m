@@ -10,7 +10,7 @@ function options = tofset(varargin)
 %
 %KNOWN PROPERTIES
 %
-%dJtol - Convergence tolerance for gravity coefficients [ positive real {1e-8} ]
+%dJtol - Convergence tolerance for gravity coefficients [ positive real {1e-6} ]
 %drhotol - Convergence tolerance for density adjustment [ positive real {1e-6} ]
 %MaxIterBar - Number of iterations allowed for relaxation to barotrope [ positive integer {60} ]
 %MaxIterHE - Number of iterations allowed for relaxation to equilibrium shape [ positive integer {60} ]
@@ -27,7 +27,7 @@ end
 p = inputParser;
 p.FunctionName = mfilename;
 
-p.addParameter('dJtol',1e-8,@isposscalar)
+p.addParameter('dJtol',1e-6,@isposscalar)
 p.addParameter('drhotol',1e-6,@isposscalar)
 p.addParameter('MaxIterBar',60,@isposintscalar)
 p.addParameter('MaxIterHE',60,@isposintscalar)
