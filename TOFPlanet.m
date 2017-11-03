@@ -84,16 +84,19 @@ classdef TOFPlanet < handle
                 obj.P0 = 0*obj.u.bar;
             end
             
-            t_rlx = tic;
-            
             % Optional communication
             verb = obj.opts.verbosity;
             if (verb > 0)
                 fprintf('Relaxing to desired barotrope...\n\n')
             end
             
-            % Main loop
+            % Ready, set,...
+            mihe = obj.opts.MaxIterHE;
+            obj.opts.MaxIterHE = 2;
             warning('off','TOF4:maxiter')
+            t_rlx = tic;
+            
+            % Main loop
             iter = 1;
             while (iter <= obj.opts.MaxIterBar)
                 t_pass = tic;
@@ -128,6 +131,9 @@ classdef TOFPlanet < handle
                 iter = iter + 1;
             end
             ET = toc(t_rlx);
+            
+            % Some clean up
+            obj.opts.MaxIterHE = mihe;
             warning('on','TOF4:maxiter')
             
             % Renormalize densities, radii.

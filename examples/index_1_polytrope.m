@@ -59,7 +59,6 @@ tof.rhoi = rho_c*sin(a*x)./(a*x);
 %% Relax to desired barotrope
 tof.opts.drhotol = 1e-5;
 tof.opts.dJtol = 1e-6;
-tof.opts.MaxIterHE = 4;
 tof.opts.MaxIterBar = 30;
 tof.relax_to_barotrope;
 
