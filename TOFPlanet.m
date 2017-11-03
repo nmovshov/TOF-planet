@@ -93,6 +93,7 @@ classdef TOFPlanet < handle
             end
             
             % Main loop
+            warning('off','TOF4:maxiter')
             iter = 1;
             while (iter <= obj.opts.MaxIterBar)
                 t_pass = tic;
@@ -127,6 +128,7 @@ classdef TOFPlanet < handle
                 iter = iter + 1;
             end
             ET = toc(t_rlx);
+            warning('on','TOF4:maxiter')
             
             % Renormalize densities, radii.
             obj.alfar = obj.radius/obj.a0;
@@ -151,7 +153,13 @@ classdef TOFPlanet < handle
             t_rlx = tic;
             zvec = double(obj.si/obj.si(1));
             dvec = double(obj.rhoi/obj.rhobar);
-            [obj.Js, out] = tof4(zvec, dvec, obj.mrot, obj.opts.dJtol, obj.opts.MaxIterHE);
+            if isempty(obj.ss)
+                ss_guess = [];
+            else
+                ss_guess = structfun(@flipud, obj.ss, 'UniformOutput', false);
+            end
+            [obj.Js, out] = tof4(zvec, dvec, obj.mrot,...
+                obj.opts.dJtol, obj.opts.MaxIterHE, ss_guess);
             ET = toc(t_rlx);
             dJ = out.dJs;
             obj.ss = structfun(@flipud, out.ss, 'UniformOutput', false);

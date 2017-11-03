@@ -1,21 +1,24 @@
-function [Js, out] = tof4(zvec, dvec, mrot, tol, maxiter)
+function [Js, out] = tof4(zvec, dvec, mrot, tol, maxiter, ss_guesses)
 %TOF4 Forth-order Theory of Figures gravity coefficients.
 %   Js = TOF4(zvec, dvec, mrot)
-%   Js = TOF4(zvec, dvec, mrot, tol, maxiter)
+%   Js = TOF4(zvec, dvec, mrot, tol, maxiter, ss_guesses)
 
 %% Input parsing
 try
-    narginchk(3,5);
+    narginchk(3,6);
 catch ME
     help('tof4.m')
     rethrow(ME)
 end
 if nargin < 4 || isempty(tol), tol = 1e-6; end
 if nargin < 5 || isempty(maxiter), maxiter = 100; end
+if nargin < 6 || isempty(ss_guesses), ss_guesses = struct(); end
 validateattributes(zvec,{'numeric'},{'finite','nonnegative','vector'},'','zvec',1)
 validateattributes(dvec,{'numeric'},{'finite','nonnegative','vector'},'','dvec',2)
 validateattributes(mrot,{'numeric'},{'finite','nonnegative','scalar'},'','mrot',3)
 validateattributes(tol,{'numeric'},{'finite','positive','scalar'},'','tol',4)
+validateattributes(maxiter,{'numeric'},{'positive','scalar','integer'},'','maxiter',5)
+validateattributes(ss_guesses,{'struct'},{'scalar'},'','ss_guesses',6)
 assert(length(zvec) == length(dvec),...
     'length(zvec)=%d~=%d=length(dvec)',length(zvec),length(dvec))
 [zvec, I] = sort(zvec);
@@ -27,11 +30,21 @@ dvec = dvec(:); % now it's a column for sure
 if zvec(1) == 0, zvec(1) = eps; end
 
 %% Initialize local variables
-N = length(zvec);
-ss.s0(N,1)=0; ss.s2(N,1)=0; ss.s4(N,1)=0; ss.s6(N,1)=0; ss.s8(N,1)=0;
-Js = [0, 0, 0, 0, 0];
+if nargin < 6 || isempty(fieldnames(ss_guesses))
+    N = length(zvec);
+    ss.s0(N,1)=0; ss.s2(N,1)=0; ss.s4(N,1)=0; ss.s6(N,1)=0; ss.s8(N,1)=0;
+else
+    try
+        ss = ss_guesses;
+        fs = B1617(ss);
+        SS = B9(zvec, dvec, fs);
+    catch ME
+        error('Shape functions guess failed because:\n%s',ME.message)
+    end
+end
 
 %% The loop, following Nettelmann (2017) Appendix B
+Js = [0, 0, 0, 0, 0]; % J0=0 ensures at least one iteration
 for iter=1:maxiter
     % Equations B.16-B.17
     fs = B1617(ss);
@@ -54,7 +67,7 @@ for iter=1:maxiter
     end
 end
 if iter == maxiter
-    warning('Figure functions may not be fully converged.')
+    warning('TOF4:maxiter','Figure functions may not be fully converged.')
 end
 
 %% Return
