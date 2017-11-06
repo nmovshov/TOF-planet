@@ -59,17 +59,43 @@ classdef TOFPlanet < handle
             
             % Init privates
             obj.aos = 1;
-            if obj.opts.debug
-                obj.u = setUnits;
-            else
-                obj.u = setFUnits;
+            try
+                if obj.opts.debug
+                    obj.u = setUnits;
+                else
+                    obj.u = setFUnits;
+                end
+                obj.G = obj.u.gravity;
+            catch ME
+                if isequal(ME.identifier,'MATLAB:UndefinedFunction')
+                    error('Check your path, did you forget to run setws()?\n%s',ME.message)
+                end
+                rethrow(ME)
             end
-            obj.G = obj.u.gravity;
         end
     end % End of constructor block
     
     %% Public methods
     methods (Access = public)
+        function set_ss_guesses(obj, ss_guesses)
+            % Supply a shape functions struct to seed relax_to_HE call.
+            
+            if nargin < 2, ss_guesses = []; end
+            if isempty(ss_guesses), obj.ss = []; return; end
+            validateattributes(ss_guesses,{'struct'},{'scalar'},'','ss_guesses',1)
+            try
+                x = ss_guesses;
+                validateattributes(x.s0,{'numeric'},{'column','numel',obj.N},'','s0')
+                validateattributes(x.s2,{'numeric'},{'column','numel',obj.N},'','s2')
+                validateattributes(x.s4,{'numeric'},{'column','numel',obj.N},'','s4')
+                validateattributes(x.s6,{'numeric'},{'column','numel',obj.N},'','s6')
+                validateattributes(x.s8,{'numeric'},{'column','numel',obj.N},'','s8')
+                obj.ss = ss_guesses;
+            catch ME
+                warning('ss_guesses not set because:\n%s',ME.message)
+            end
+        end
+        
         function ET = relax_to_barotrope(obj)
             % Relax equilibrium shape functions, Js, and density simultaneously.
             
