@@ -99,9 +99,20 @@ classdef TOFPlanet < handle
         function ET = relax_to_barotrope(obj)
             % Relax equilibrium shape functions, Js, and density simultaneously.
             
+            % First some checks.
             if isempty(obj.eos)
                 warning('TOFPLANET:assertion',...
-                    'Set valid barotrope first (<obj>.eos = <barotrope>)')
+                    'Set valid barotrope first (<obj>.eos = <barotrope>).')
+                return
+            end
+            if numel(obj.renormalize()) < 2
+                warning('TOFPLANET:assertion',...
+                    'First set reference mass and equatorial radius.')
+                return
+            end
+            if isempty(obj.mrot)
+                warning('TOFPLANET:assertion',...
+                    'First set rotation parameter (<obj>.mrot).')
                 return
             end
             if isempty(obj.P0)
