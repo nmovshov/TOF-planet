@@ -14,7 +14,7 @@ narginchk(1,inf)
 validateattributes(N, {'numeric'}, {'positive', 'integer', 'scalar'}, '', 'N', 1)
 opts = parse_others(varargin{:});
 
-zvec = zvecs.topheavy(N, opts.skew);
+zvec = zvecs.equal_dr(N);
 
 end
 
