@@ -28,7 +28,7 @@ try
     validateattributes(zstrat, {'function_handle'}, {}, '', 'zstrat', 3)
     assert(x(7) > 0 && x(7) < 1, 'First transition radius must be in (0,1).')
     assert(x(8) > 0 && x(8) < 1, 'Second transition radius must be in (0,1).')
-    assert(x(8) < x(7), 'Second transition must come before first transition.')
+    assert(x(8) <= x(7), 'Second transition must come before first transition.')
 catch ME
     help('tofmodels.triple_polytrope')
     rethrow(ME)
@@ -43,11 +43,7 @@ assert(all(svec > 0) && all(svec <= 1),...
     '@zstrat(N) must return a vector of length N with values in (0,1].')
 
 [~, tind] = min(abs(svec-x(7)));
-assert(tind > 2,...
-    'First transition too close to surface; first polytrope has zero layers.')
 [~, cind] = min(abs(svec-x(8)));
-assert(cind > tind,...
-    'Transitions are too close together; second polytrope has zero layers.')
 svec(tind) = x(7);
 svec(cind) = x(8);
 
