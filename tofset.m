@@ -5,7 +5,7 @@ function options = tofset(varargin)
 %   Any unspecified properties have default values. Case is ignored for property
 %   names.
 %
-%   TOFSET with no input arguments displays all property names and their
+%   TOFSET with no input or output arguments displays all property names and their
 %   possible values.
 %
 %KNOWN PROPERTIES
