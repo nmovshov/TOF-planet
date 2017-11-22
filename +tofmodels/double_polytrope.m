@@ -25,7 +25,9 @@ try
     validateattributes(zstrat, {'function_handle'}, {}, '', 'zstrat', 3)
     assert(x(5)>0 && x(5)<1, 'Transition (normalized) radius must be in (0,1).')
 catch ME
-    help('tofmodels.double_polytrope')
+    if nargout == 0
+        help('tofmodels.double_polytrope')
+    end
     rethrow(ME)
 end
 

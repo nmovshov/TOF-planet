@@ -30,7 +30,9 @@ try
     assert(x(8) > 0 && x(8) < 1, 'Second transition radius must be in (0,1).')
     assert(x(8) <= x(7), 'Second transition must come before first transition.')
 catch ME
-    help('tofmodels.triple_polytrope')
+    if nargout == 0
+        help('tofmodels.triple_polytrope')
+    end
     rethrow(ME)
 end
 

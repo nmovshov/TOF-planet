@@ -18,7 +18,9 @@ try
     validateattributes(x, {'numeric'}, {'vector', 'numel', 2, 'nonnegative'}, 2)
     validateattributes(zstrat, {'function_handle'}, {}, '', 'zstrat', 3)
 catch ME
-    help('tofmodels.single_polytrope')
+    if nargout == 0
+        help('tofmodels.single_polytrope')
+    end
     rethrow(ME)
 end
 
