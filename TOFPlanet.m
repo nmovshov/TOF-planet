@@ -759,6 +759,7 @@ classdef TOFPlanet < handle
             s.a0     = obj.a0;
             s.M_core = obj.core_mass;
             s.R_core = obj.core_radius;
+            s.rhobar = obj.rhobar;
             s.mrot   = obj.mrot;
             s.qrot   = obj.qrot;
             s.J2     = obj.J2;
