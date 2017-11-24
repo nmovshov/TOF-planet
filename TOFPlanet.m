@@ -300,6 +300,15 @@ classdef TOFPlanet < handle
         
         function mcore = core_mass(obj, bypeaks)
             % Return estimated core mass.
+            % mcore = CORE_MASS() returns the mass contained in the innermost
+            % contiguous block of levels associated with the same Barotrope
+            % object.
+            %
+            % mcore = CORE_MASS(bypeaks) if bypeaks==true instead uses the peaks
+            % function to identify the innermost block of contiguous levels
+            % following a detectable density jump. The default is bypeaks=false
+            % but If the planet has no associated barotrope or only a single
+            % barotrope then the function falls back to using peaks.
             
             if nargin < 2, bypeaks = false; end
             
