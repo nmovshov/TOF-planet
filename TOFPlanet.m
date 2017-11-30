@@ -761,7 +761,7 @@ classdef TOFPlanet < handle
             
             % Basic table
             vitals = {'Mass [kg]'; 'J2'; 'J4'; 'J6'; 'J8'; 'NMoI'; '"core" mass [kg]'};
-            TOF1 = [obj.M; obj.J2; obj.J4; obj.J6; obj.J8; obj.NMoI; obj.core_mass()];
+            TOF1 = [obj.M; obj.J2; obj.J4; obj.J6; obj.J8; obj.NMoI; obj.M_core];
             TOF1 = double(TOF1);
             T = table(TOF1, 'RowNames', vitals);
             if ~isempty(obj.name)
@@ -826,8 +826,8 @@ classdef TOFPlanet < handle
             s.M      = obj.M;
             s.s0     = obj.s0;
             s.a0     = obj.a0;
-            s.M_core = obj.core_mass;
-            s.R_core = obj.core_radius;
+            s.M_core = obj.M_core;
+            s.R_core = obj.R_core;
             s.rhobar = obj.rhobar;
             s.mrot   = obj.mrot;
             s.qrot   = obj.qrot;
@@ -884,7 +884,7 @@ classdef TOFPlanet < handle
             fprintf(fid,'# Rotation parameter m = %0.6f\n', double(obj.mrot));
             fprintf(fid,'# Rotation parameter q = %0.6f\n', double(obj.qrot));
             fprintf(fid,'# Core mass fraction M_core/M = %g\n', ...
-                double(obj.core_mass)/double(obj.M));
+                double(obj.M_core)/double(obj.M));
             fprintf(fid,'#\n');
             fprintf(fid,'# Calculated gravity zonal harmonics (x 10^6):\n');
             fprintf(fid,'# J2  = %12.6f\n', obj.J2*1e6);
