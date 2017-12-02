@@ -436,7 +436,7 @@ classdef TOFPlanet < handle
             
             % Don't bother if there is no pressure
             if isempty(obj.Pi)
-                warning('Uninitialized object.')
+                warning('Uninitialized object. Remember to set obj.P0?')
                 return
             end
             
