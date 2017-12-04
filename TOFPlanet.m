@@ -298,6 +298,23 @@ classdef TOFPlanet < handle
             end
         end
         
+        function m = Z_mass(obj, bgeos)
+            % Estimated mass in heavy elements after subtracting a background eos.
+            
+            validateattributes(bgeos,{'barotropes.Barotrope'},{'scalar'})
+            if isempty(obj.Pi)
+                warning('Uninitialized object. Remember to set obj.P0?')
+                return
+            end
+            
+            bgrho = bgeos.density(double(obj.Pi));
+            bgrho(isnan(bgrho)) = 0;
+            fgrho = double(obj.rhoi) - bgrho;
+            fgrho(fgrho < 0) = 0;
+            drho = [fgrho(1); diff(fgrho)];
+            m = (4*pi/3)*sum(drho.*double(obj.si.^3));
+        end
+        
         function mcore = core_mass(obj, how)
             % Return estimated core mass.
             % mcore = CORE_MASS(how) returns the estimated mass in the planet's
