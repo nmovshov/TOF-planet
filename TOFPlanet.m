@@ -300,11 +300,22 @@ classdef TOFPlanet < handle
         
         function m = Z_mass(obj, bgeos)
             % Estimated mass in heavy elements after subtracting a background eos.
+            %
+            % Usage: m = tof.Z_mass(bgeos)
+            %   bgeos - a Barotrope object used to remove background density.
             
+            try
+                narginchk(2,2)
             validateattributes(bgeos,{'barotropes.Barotrope'},{'scalar'})
             if isempty(obj.Pi)
                 warning('Uninitialized object. Remember to set obj.P0?')
                 return
+            end
+            catch ME
+                if nargout == 0
+                    help TOFPlanet.Z_mass
+                end
+                rethrow(ME)
             end
             
             bgrho = bgeos.density(double(obj.Pi));
@@ -640,8 +651,9 @@ classdef TOFPlanet < handle
             % Input parsing
             p = inputParser;
             p.FunctionName = mfilename;
-            p.addParameter('axes', [], @(x)isscalar(x) && isgraphics(x, 'axes'));
-            p.addParameter('plottype', 'line', @(x)isrow(x) && ischar(x));
+            p.addParameter('axes', [], @(x)isscalar(x) && isgraphics(x, 'axes'))
+            p.addParameter('plottype', 'line', @(x)isrow(x) && ischar(x))
+            p.addParameter('removeeos',[],@(x)isscalar(x)&&isa(x,'barotropes.Barotrope'))
             p.parse(varargin{:})
             pr = p.Results;
             
@@ -660,6 +672,16 @@ classdef TOFPlanet < handle
             % Prepare the data
             x = [double(obj.si/obj.s0); 0];
             y = double([obj.rhoi; obj.rhoi(end)]);
+            if ~isempty(pr.removeeos) % optionally remove background density
+                if isempty(obj.Pi)
+                    warning('Uninitialized object. Remember to set obj.P0?')
+                    return
+                end
+                bgrho = pr.removeeos.density(double(obj.Pi));
+                bgrho(isnan(bgrho)) = 0;
+                bgrho = [bgrho; bgrho(end)];
+                y = max(y - bgrho, 0);
+            end
             
             % Plot the lines (density in 1000 kg/m^3)
             if isequal(lower(pr.plottype), 'stairs')
