@@ -15,6 +15,7 @@ classdef TOFPlanet < handle
         rhoi   % vector of densities on si grid
         mrot   % rotation parameter, w^2s0^3/GM
         eos    % barotrope(s) (tip: help barotropes for options)
+        bgeos  % optional background barotrope
         opts   % holds user configurable options (tip: help tofset)
     end
     properties (SetAccess = private)
@@ -28,6 +29,7 @@ classdef TOFPlanet < handle
     properties (Dependent)
         M      % calculated mass
         mi     % cumulative mass below si
+        M_Z    % estimated heavy elements mass (using background eos)
         M_core % estimated core mass
         R_core % estimated core radius
         s0     % calculated mean radius (another name for obj.si(1))
@@ -304,20 +306,10 @@ classdef TOFPlanet < handle
             % Usage: m = tof.Z_mass(bgeos)
             %   bgeos - a Barotrope object used to remove background density.
             
-            try
-                narginchk(2,2)
             validateattributes(bgeos,{'barotropes.Barotrope'},{'scalar'})
             if isempty(obj.Pi)
-                warning('Uninitialized object. Remember to set obj.P0?')
-                return
+                error('Uninitialized object. Remember to set obj.P0?')
             end
-            catch ME
-                if nargout == 0
-                    help TOFPlanet.Z_mass
-                end
-                rethrow(ME)
-            end
-            
             bgrho = bgeos.density(double(obj.Pi));
             bgrho(isnan(bgrho)) = 0;
             fgrho = double(obj.rhoi) - bgrho;
@@ -861,12 +853,13 @@ classdef TOFPlanet < handle
             
             if nargin < 2, rdc = 1; end % 0=none, 1=to double, 2=to single
             
-            s.name = obj.name;
+            s.name   = obj.name;
             s.M      = obj.M;
             s.s0     = obj.s0;
             s.a0     = obj.a0;
             s.M_core = obj.M_core;
             s.R_core = obj.R_core;
+            s.M_Z    = obj.M_Z;
             s.rhobar = obj.rhobar;
             s.mrot   = obj.mrot;
             s.qrot   = obj.qrot;
@@ -882,9 +875,11 @@ classdef TOFPlanet < handle
             
             if rdc == 1
                 s = structfun(@double, s, 'UniformOutput', false);
+                s.name = obj.name;
             end
             if rdc == 2
                 s = structfun(@single, s, 'UniformOutput', false);
+                s.name = obj.name;
             end
         end
         
@@ -1059,9 +1054,18 @@ classdef TOFPlanet < handle
             if ~isa(val,'barotropes.Barotrope')
                 error('eos must be a valid instance of class Barotrope')
             end
-%             assert(numel(val)==1 || numel(val)==obj.N,...
-%                 'eos must be scalar or same length as radius grid.')
             obj.eos = val(:);
+        end
+        
+        function set.bgeos(obj,val)
+            if isempty(val)
+                obj.bgeos = [];
+                return
+            end
+            if ~isa(val,'barotropes.Barotrope')
+                error('bgeos must be a valid instance of class Barotrope')
+            end
+            obj.bgeos = val;
         end
         
         function val = get.M(obj)
@@ -1094,6 +1098,14 @@ classdef TOFPlanet < handle
                     val(k) = val(k+1) + 4*pi/3*rho(k)*(s(k)^3 - s(k+1)^3);
                 end
                 val = val';
+            end
+        end
+        
+        function val = get.M_Z(obj)
+            try
+                val = obj.Z_mass(obj.bgeos);
+            catch
+                val = [];
             end
         end
         
