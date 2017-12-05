@@ -698,6 +698,10 @@ classdef TOFPlanet < handle
                 ah.Box = 'on';
                 xlabel('Level surface radius, $s/s_0$', 'fontsize', 12)
                 ylabel('$\rho$ [1000 kg/m$^3$]', 'fontsize', 12)
+                if ~isempty(pr.removeeos)
+                    s = sprintf('$\\rho - \\rho_{\\mathrm{%s}}$ [1000 kg/m$^3$]',pr.removeeos.name);
+                    ylabel(s, 'fontsize', 12)
+                end
             else
                 xlim('auto')
             end
