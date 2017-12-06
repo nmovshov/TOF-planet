@@ -1212,7 +1212,11 @@ classdef TOFPlanet < handle
         end
         
         function val = get.J8(obj)
-            val = obj.Js(5);
+            if isempty(obj.Js)
+                val = 0;
+            else
+                val = obj.Js(5);
+            end
         end
         
     end % End of access methods block
