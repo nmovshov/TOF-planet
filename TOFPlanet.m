@@ -852,10 +852,11 @@ classdef TOFPlanet < handle
             T = [T table(DIFF, 'VariableNames', {'diff'})];
         end
         
-        function s = to_struct(obj, rdc)
+        function s = to_struct(obj, rdc, keepss)
             % Convert object to static struct keeping only essential fields.
             
             if nargin < 2, rdc = 1; end % 0=none, 1=to double, 2=to single
+            if nargin < 3, keepss = false; end % keep ss e.g. to help essample
             
             s.name   = obj.name;
             s.M      = obj.M;
@@ -884,6 +885,10 @@ classdef TOFPlanet < handle
             if rdc == 2
                 s = structfun(@single, s, 'UniformOutput', false);
                 s.name = obj.name;
+            end
+            
+            if keepss
+                s.ss = obj.ss;
             end
         end
         
@@ -1183,15 +1188,27 @@ classdef TOFPlanet < handle
         end
         
         function val = get.J2(obj)
-            val = obj.Js(2);
+            if isempty(obj.Js)
+                val = 0;
+            else
+                val = obj.Js(2);
+            end
         end
         
         function val = get.J4(obj)
-            val = obj.Js(3);
+            if isempty(obj.Js)
+                val = 0;
+            else
+                val = obj.Js(3);
+            end
         end
         
         function val = get.J6(obj)
-            val = obj.Js(4);
+            if isempty(obj.Js)
+                val = 0;
+            else
+                val = obj.Js(4);
+            end
         end
         
         function val = get.J8(obj)
