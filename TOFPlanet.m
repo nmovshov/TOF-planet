@@ -1027,6 +1027,7 @@ classdef TOFPlanet < handle
         function val = get.Ui(obj)
             % Following Nettelmann 2017 eqs. B3 and B.4, assuming equipotential.
             if isempty(obj.ss), val = []; return, end
+            if isempty(obj.SS), val = []; return, end
             
             s2 = obj.ss.s2;
             s4 = obj.ss.s4;
