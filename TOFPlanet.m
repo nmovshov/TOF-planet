@@ -1019,8 +1019,11 @@ classdef TOFPlanet < handle
         end
         
         function set.rhoi(obj, val)
-            assert(isnumeric(val) && isvector(val) && ~any(val<0),...
+            assert(isnumeric(val) && isvector(val),...
                 'obj.rhoi must be a nonnegative vector.')
+            if any(val<0)
+                warning('TOFPLANET:assertion','negative density. Is this on purpose?')
+            end
             obj.rhoi = val(:);
         end
         
