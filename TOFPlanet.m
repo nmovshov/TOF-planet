@@ -35,6 +35,7 @@ classdef TOFPlanet < handle
         s0     % calculated mean radius (another name for obj.si(1))
         a0     % calculated equatorial radius
         rhobar % calculated mean density
+        rho_Z  % rhoi minus background density
         qrot   % rotation parameter referenced to a0
         NMoI   % normalized moment of inertia
         Ui     % gravitational potential on grid
@@ -300,7 +301,7 @@ classdef TOFPlanet < handle
             end
         end
         
-        function m = Z_mass(obj, bgeos)
+        function [m, fgrho] = Z_mass(obj, bgeos)
             % Estimated mass in heavy elements after subtracting a background eos.
             %
             % Usage: m = tof.Z_mass(bgeos)
@@ -313,7 +314,7 @@ classdef TOFPlanet < handle
             bgrho = bgeos.density(double(obj.Pi));
             bgrho(isnan(bgrho)) = 0;
             fgrho = double(obj.rhoi) - bgrho;
-            fgrho(fgrho < 0) = 0;
+            %fgrho(fgrho < 0) = 0;
             drho = [fgrho(1); diff(fgrho)];
             m = (4*pi/3)*sum(drho.*double(obj.si.^3));
         end
@@ -1117,6 +1118,14 @@ classdef TOFPlanet < handle
         function val = get.M_Z(obj)
             try
                 val = obj.Z_mass(obj.bgeos);
+            catch
+                val = [];
+            end
+        end
+        
+        function val = get.rho_Z(obj)
+            try
+                [~,val] = obj.Z_mass(obj.bgeos);
             catch
                 val = [];
             end
