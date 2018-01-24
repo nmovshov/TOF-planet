@@ -16,6 +16,8 @@ classdef TOFPlanet < handle
         mrot   % rotation parameter, w^2s0^3/GM
         eos    % barotrope(s) (tip: help barotropes for options)
         bgeos  % optional background barotrope
+        fgeos  % optional foreground barotrope
+        rhoc   % threshold density indicating transition to solid core
         opts   % holds user configurable options (tip: help tofset)
     end
     properties (SetAccess = private)
@@ -338,24 +340,26 @@ classdef TOFPlanet < handle
             % contained in layers with density greater than rhoc.
             %
             % Note: the TOFPlanet property M_core is obtained with the call
-            %       mcore = obj.core_mass(4500);
+            %       mcore = obj.core_mass(obj.rhoc);
             
-            try
-                if isnumeric(how)
-                    validateattributes(how,{'numeric','preal'},{'positive','scalar'})
-                    if how < 0.5*obj.rhobar
-                        warning('Are you using the right density units?')
-                    end
-                else
-                    how = validatestring(how,{'byeos','bypeaks'});
-                end
-            catch ME
+            if nargin == 1 && nargout == 0
                 help TOFPlanet.core_mass
-                rethrow(ME)
+                return
+            end
+            if isnumeric(how)
+                validateattributes(how,{'numeric','preal'},{'positive','scalar'})
+                if how < 0.5*obj.rhobar
+                    warning('Are you using the right density units?')
+                end
+            else
+                how = validatestring(how,{'byeos','bypeaks'});
             end
             switch how
                 case 'byeos'
                     % Define core as innermost contiguous block of same eos
+                    if isempty(obj.eos)
+                        error('Object not assigned EOS yet.')
+                    end
                     alleos = obj.eos;
                     if isequal(alleos(1), barotropes.ConstDensity(0))
                         zlay = true;
@@ -405,24 +409,26 @@ classdef TOFPlanet < handle
             % of the outermost level surface with density greater than rhoc.
             %
             % Note: the TOFPlanet property R_core is obtained with the call
-            %       rcore = obj.core_radius(4500);
+            %       rcore = obj.core_radius(obj.rhoc);
             
-            try
-                if isnumeric(how)
-                    validateattributes(how,{'numeric','preal'},{'positive','scalar'})
-                    if how < 0.5*obj.rhobar
-                        warning('Are you using the right density units?')
-                    end
-                else
-                    how = validatestring(how,{'byeos','bypeaks'});
-                end
-            catch ME
+            if nargin == 1 && nargout == 0
                 help TOFPlanet.core_radius
-                rethrow(ME)
+                return
+            end
+            if isnumeric(how)
+                validateattributes(how,{'numeric','preal'},{'positive','scalar'})
+                if how < 0.5*obj.rhobar
+                    warning('Are you using the right density units?')
+                end
+            else
+                how = validatestring(how,{'byeos','bypeaks'});
             end
             switch how
                 case 'byeos'
                     % Define core as innermost contiguous block of same eos
+                    if isempty(obj.eos)
+                        error('Object not assigned EOS yet.')
+                    end
                     alleos = obj.eos;
                     if isequal(alleos(1), barotropes.ConstDensity(0))
                         zlay = true;
@@ -799,6 +805,7 @@ classdef TOFPlanet < handle
             vitals = {'Mass [kg]'; 'J2'; 'J4'; 'J6'; 'J8'; 'NMoI'; '"core" mass [kg]'};
             TOF1 = [obj.M; obj.J2; obj.J4; obj.J6; obj.J8; obj.NMoI; obj.M_core];
             TOF1 = double(TOF1);
+            if isempty(obj.M_core), TOF1 = [TOF1; NaN]; end
             T = table(TOF1, 'RowNames', vitals);
             if ~isempty(obj.name)
                 vname = matlab.lang.makeValidName(obj.name);
@@ -840,6 +847,7 @@ classdef TOFPlanet < handle
             end
             OBS1 = [oM; oJ2; oJ4; oJ6; oJ8; oNMoI; oM_core];
             OBS1 = double(OBS1);
+            if isempty(oM_core), OBS1 = [OBS1; NaN]; end
             T = [T table(OBS1)];
             if ~isempty(oname)
                 vname = matlab.lang.makeValidName(obs.name);
@@ -1081,6 +1089,17 @@ classdef TOFPlanet < handle
             end
             obj.bgeos = val;
         end
+
+        function set.fgeos(obj,val)
+            if isempty(val)
+                obj.fgeos = [];
+                return
+            end
+            if ~isa(val,'barotropes.Barotrope')
+                error('fgeos must be a valid instance of class Barotrope')
+            end
+            obj.fgeos = val;
+        end
         
         function val = get.M(obj)
             if isempty(obj.si) || isempty(obj.rhoi)
@@ -1133,7 +1152,7 @@ classdef TOFPlanet < handle
         
         function val = get.M_core(obj)
             try
-                val = obj.core_mass(4500*obj.u.kg/obj.u.m^3);
+                val = obj.core_mass(obj.rhoc);
             catch
                 val = [];
             end
@@ -1141,7 +1160,7 @@ classdef TOFPlanet < handle
         
         function val = get.R_core(obj)
             try
-                val = obj.core_radius(4500*obj.u.kg/obj.u.m^3);
+                val = obj.core_radius(obj.rhoc);
             catch
                 val = [];
             end
