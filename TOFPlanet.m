@@ -381,7 +381,11 @@ classdef TOFPlanet < handle
                     dvec = double(obj.rhoi/obj.rhobar)';
                     deltas = [dvec(1), diff(dvec)];
                     cind = peakfinder(deltas);
-                    mcore = obj.mi(cind(end));
+                    if isempty(obj.rhoc) || obj.rhoi(cind(end)+1) >= obj.rhoc
+                        mcore = obj.mi(cind(end));
+                    else
+                        mcore = 0*obj.M;
+                    end
                 otherwise
                     % Define core as anything with density over rhoc
                     cind = find(obj.rhoi > how, 1, 'first');
