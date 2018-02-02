@@ -875,6 +875,7 @@ classdef TOFPlanet < handle
             s.M      = obj.M;
             s.s0     = obj.s0;
             s.a0     = obj.a0;
+            s.rhoc   = obj.rhoc;
             s.M_core = obj.M_core;
             s.R_core = obj.R_core;
             s.M_Z    = obj.M_Z;
