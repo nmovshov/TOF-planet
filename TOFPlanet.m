@@ -31,13 +31,14 @@ classdef TOFPlanet < handle
     properties (Dependent)
         M      % calculated mass
         mi     % cumulative mass below si
-        M_Z    % estimated heavy elements mass (using background eos)
+        zi     % mass fraction in heavy elements
+        mzi    % cumulative heavy elements mass below si
         M_core % estimated core mass
         R_core % estimated core radius
+        M_Z    % estimated total heavy elements mass
         s0     % calculated mean radius (another name for obj.si(1))
         a0     % calculated equatorial radius
         rhobar % calculated mean density
-        rho_Z  % rhoi minus background density
         qrot   % rotation parameter referenced to a0
         NMoI   % normalized moment of inertia
         Ui     % gravitational potential on grid
@@ -301,24 +302,6 @@ classdef TOFPlanet < handle
                 otherwise
                     error('Unknown mass calculation method.')
             end
-        end
-        
-        function [m, fgrho] = Z_mass(obj, bgeos)
-            % Estimated mass in heavy elements after subtracting a background eos.
-            %
-            % Usage: m = tof.Z_mass(bgeos)
-            %   bgeos - a Barotrope object used to remove background density.
-            
-            validateattributes(bgeos,{'barotropes.Barotrope'},{'scalar'})
-            if isempty(obj.Pi)
-                error('Uninitialized object. Remember to set obj.P0?')
-            end
-            bgrho = bgeos.density(double(obj.Pi));
-            bgrho(isnan(bgrho)) = 0;
-            fgrho = double(obj.rhoi) - bgrho;
-            %fgrho(fgrho < 0) = 0;
-            drho = [fgrho(1); diff(fgrho)];
-            m = (4*pi/3)*sum(drho.*double(obj.si.^3));
         end
         
         function mcore = core_mass(obj, how)
@@ -891,6 +874,7 @@ classdef TOFPlanet < handle
             s.rhoi   = obj.rhoi;
             s.Pi     = obj.Pi;
             s.mi     = obj.mi;
+            s.zi     = obj.zi;
             
             if rdc == 1
                 s = structfun(@double, s, 'UniformOutput', false);
@@ -914,6 +898,9 @@ classdef TOFPlanet < handle
             T.rhoi = double(obj.rhoi);
             T.Pi = double(obj.Pi);
             T.mi = double(obj.mi);
+            if ~isempty(obj.zi)
+                T.zi = double(obj.zi);
+            end
         end
         
         function to_ascii(obj, fname)
@@ -1139,17 +1126,42 @@ classdef TOFPlanet < handle
             end
         end
         
-        function val = get.M_Z(obj)
-            try
-                val = obj.Z_mass(obj.bgeos);
-            catch
+        function val = get.mzi(obj)
+            % heavy element mass below level i
+            if isempty(obj.si) || isempty(obj.rhoi) || isempty(obj.zi)
                 val = [];
+            else
+                rho = obj.rhoi;
+                s = obj.si;
+                z = obj.zi;
+                val(obj.N) = 4*pi/3*rho(obj.N)*s(obj.N)^3*z(obj.N);
+                for k=obj.N-1:-1:1
+                    cz = max(min(z(k), 1), 0);
+                    val(k) = val(k+1) + 4*pi/3*rho(k)*(s(k)^3 - s(k+1)^3)*cz;
+                end
+                val = val';
             end
         end
         
-        function val = get.rho_Z(obj)
+        function val = get.zi(obj)
+            % heavy element mass fraction on level i
+            if isempty(obj.bgeos) || isempty(obj.fgeos) || isempty(obj.Pi)
+                val = [];
+            else
+                val = nan(obj.N,1);
+                for k=1:obj.N
+                    roxy = obj.bgeos.density(obj.Pi(k));
+                    roz = obj.fgeos.density(obj.Pi(k));
+                    ro = obj.rhoi(k);
+                    val(k) = (1/ro - 1/roxy)/(1/roz - 1/roxy);
+                    if isnan(val(k)), val(k) = 0; end
+                end
+            end
+        end
+        
+        function val = get.M_Z(obj)
             try
-                [~,val] = obj.Z_mass(obj.bgeos);
+                val = obj.mzi(1);
             catch
                 val = [];
             end
@@ -1218,7 +1230,7 @@ classdef TOFPlanet < handle
                 s = obj.si;
                 for k=1:obj.N-1
                     m = 4*pi/3*rho(k)*(s(k)^3 - s(k+1)^3);
-                    I(k) = 2/5*m*(s(k)^5 - s(k+1)^5)/(s(k)^3 - s(k+1)^3);
+                    I(k) = 2/5*m*(s(k)^5 - s(k+1)^5)/(s(k)^3 - s(k+1)^3); %#ok<AGROW>
                 end
                 val = sum(I)/(obj.M*obj.s0^2);
             end
