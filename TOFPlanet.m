@@ -851,7 +851,7 @@ classdef TOFPlanet < handle
         function s = to_struct(obj, rdc, keepss)
             % Convert object to static struct keeping only essential fields.
             
-            if nargin < 2, rdc = 1; end % 0=none, 1=to double, 2=to single
+            if nargin < 2, rdc = 1; end % 0=none, 1=to double, 2=to single, 3=to scalars
             if nargin < 3, keepss = false; end % keep ss e.g. to help essample
             
             s.name   = obj.name;
@@ -883,6 +883,15 @@ classdef TOFPlanet < handle
             if rdc == 2
                 s = structfun(@single, s, 'UniformOutput', false);
                 s.name = obj.name;
+            end
+            if rdc == 3
+                s = structfun(@single, s, 'UniformOutput', false);
+                s.name = obj.name;
+                s.si     = [];
+                s.rhoi   = [];
+                s.Pi     = [];
+                s.mi     = [];
+                s.zi     = [];
             end
             
             if keepss
