@@ -894,6 +894,22 @@ classdef TOFPlanet < handle
                 s.zi     = [];
             end
             
+            try
+                s.eos = obj.eos.name;
+            catch
+                s.eos = '';
+            end
+            try
+                s.bgeos = obj.bgeos.name;
+            catch
+                s.bgeos = '';
+            end
+            try
+                s.fgeos = obj.fgeos.name;
+            catch
+                s.fgeos = '';
+            end
+            
             if keepss
                 s.ss = obj.ss;
             end
