@@ -1153,12 +1153,12 @@ classdef TOFPlanet < handle
         
         function val = get.mzi(obj)
             % heavy element mass below level i
-            if isempty(obj.si) || isempty(obj.rhoi) || isempty(obj.zi)
+            z = obj.zi;
+            if isempty(obj.si) || isempty(obj.rhoi) || isempty(z)
                 val = [];
             else
                 rho = obj.rhoi;
                 s = obj.si;
-                z = obj.zi;
                 val(obj.N) = 4*pi/3*rho(obj.N)*s(obj.N)^3*z(obj.N);
                 for k=obj.N-1:-1:1
                     cz = max(min(z(k), 1), 0);
@@ -1170,13 +1170,14 @@ classdef TOFPlanet < handle
         
         function val = get.zi(obj)
             % heavy element mass fraction on level i
-            if isempty(obj.bgeos) || isempty(obj.fgeos) || isempty(obj.Pi)
+            P = obj.Pi;
+            if isempty(obj.bgeos) || isempty(obj.fgeos) || isempty(P)
                 val = [];
             else
                 val = nan(obj.N,1);
                 for k=1:obj.N
-                    roxy = obj.bgeos.density(obj.Pi(k));
-                    roz = obj.fgeos.density(obj.Pi(k));
+                    roxy = obj.bgeos.density(P(k));
+                    roz = obj.fgeos.density(P(k));
                     ro = obj.rhoi(k);
                     val(k) = (1/ro - 1/roxy)/(1/roz - 1/roxy);
                     if isnan(val(k)), val(k) = 0; end
