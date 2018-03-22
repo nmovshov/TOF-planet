@@ -17,7 +17,8 @@ classdef TOFPlanet < handle
         eos    % barotrope(s) (tip: help barotropes for options)
         bgeos  % optional background barotrope
         fgeos  % optional foreground barotrope
-        rhoc   % threshold density indicating transition to solid core
+        rhoc   % threshold density indicating possible solid core
+        zeec   % threshold Z abundance indicating posisble solid core
         opts   % holds user configurable options (tip: help tofset)
     end
     properties (SetAccess = private)
@@ -33,6 +34,7 @@ classdef TOFPlanet < handle
         mi     % cumulative mass below si
         zi     % mass fraction in heavy elements
         mzi    % cumulative heavy elements mass below si
+        Ki     % empirical bulk modulus (rho*dP/drho)
         M_core % estimated core mass
         R_core % estimated core radius
         M_Z    % estimated total heavy elements mass
@@ -304,112 +306,44 @@ classdef TOFPlanet < handle
             end
         end
         
-        function mcore = core_mass(obj, how)
-            % Return estimated core mass.
-            % mcore = CORE_MASS(how) returns the estimated mass in the planet's
-            % core. There are several options for how to decide what if any part
-            % of the planet is a core, and these are specified using the argument,
-            % how, in the following ways:
+        function [rcore, mcore, icore] = locate_core(obj, how)
+            % Look for a solid core.
             %
-            % CORE_MASS('byeos') returns the mass contained in the innermost
-            % contiguous block of levels associated with the same Barotrope
-            % object.
+            % [rcore, mcore, icore] = LOCATE_CORE(how) returns the estimated
+            % radius, mass, and starting level index of the planet's core. There
+            % are several options for how to decide what part of the planet, if
+            % any, is a core, and these are specified using the string argument
+            % 'how', in the following ways:
             %
-            % CORE_MASS('bypeaks') uses the peaks function to identify the
-            % innermost block of contiguous levels following a detectable density
-            % jump.
+            % LOCATE_CORE('byeos') locates the innermost contiguous block of
+            % levels associated with the same Barotrope object. This gives the
+            % correct answer, by definition, in the rare cases where the planet
+            % was constructed with a particular barotrope-based model in mind, and
+            % relaxed using obj.relax_to_barotrope instead of obj.relax_to_HE.
             %
-            % CORE_MASS(rhoc) where x is a numeric scalar returns the mass
-            % contained in layers with density greater than rhoc.
+            % LOCATE_CORE('byrho') attempts to identify the innermost block of
+            % contiguous levels following a detectable density jump. This block is
+            % considered to be a core if its density is higher than obj.rhoc.
             %
-            % Note: the TOFPlanet property M_core is obtained with the call
-            %       mcore = obj.core_mass(obj.rhoc);
+            % LOCATE_CORE('byZ') attempts to identify the innermost block of
+            % contiguous levels following a detectable jump in heavy elements
+            % abundance (obj.zi). This jump is considered to define a core if it
+            % leads to z greater than obj.zeec.
+            %
+            % If a core cennot be detected for any reason the function returns
+            % [0,0,0].
+            %
+            % Note: the TOFPlanet properties R_core and M_core are obtained with
+            % the calls
+            %       [rcore,~,~] = obj.detect_core('byZ');
+            %       [~,mcore,~] = obj.detect_core('byZ');
             
             if nargin == 1 && nargout == 0
-                help TOFPlanet.core_mass
+                help TOFPlanet.locate_core
                 return
             end
-            if isnumeric(how)
-                validateattributes(how,{'numeric','preal'},{'positive','scalar'})
-                if how < 0.5*obj.rhobar
-                    warning('Are you using the right density units?')
-                end
-            else
-                how = validatestring(how,{'byeos','bypeaks'});
-            end
-            switch how
-                case 'byeos'
-                    % Define core as innermost contiguous block of same eos
-                    if isempty(obj.eos)
-                        error('Object not assigned EOS yet.')
-                    end
-                    alleos = obj.eos;
-                    if isequal(alleos(1), barotropes.ConstDensity(0))
-                        zlay = true;
-                        alleos(1) = [];
-                    else
-                        zlay = false;
-                    end
-                    ind = arrayfun(@isequal, alleos,...
-                        repmat(alleos(end), numel(alleos), 1));
-                    cind = find(~ind, 1, 'last') + 1;
-                    if isempty(cind)
-                        mcore = 0;
-                    else
-                        if zlay, cind = cind + 1; end
-                        mcore = obj.mi(cind);
-                    end
-                case 'bypeaks'
-                    % Define core using a density jump
-                    dvec = double(obj.rhoi/obj.rhobar)';
-                    deltas = [dvec(1), diff(dvec)];
-                    cind = peakfinder(deltas);
-                    if isempty(obj.rhoc) || obj.rhoi(cind(end)+1) >= obj.rhoc
-                        mcore = obj.mi(cind(end));
-                    else
-                        mcore = 0*obj.M;
-                    end
-                otherwise
-                    % Define core as anything with density over rhoc
-                    cind = find(obj.rhoi > how, 1, 'first');
-                    mcore = obj.mi(cind);
-                    if isempty(mcore), mcore = 0*obj.u.kg; end
-            end
-        end
-        
-        function rcore = core_radius(obj, how)
-            % Return estimated core radius.
-            % rcore = CORE_RADIUS(how) returns the estimated radius of the planet's
-            % core. There are several options for how to decide what if any part
-            % of the planet is a core, and these are specified using the argument,
-            % how, in the following ways:
-            %
-            % CORE_RADIUS('byeos') returns the radius of the innermost
-            % contiguous block of levels associated with the same Barotrope
-            % object.
-            %
-            % CORE_RADIUS('bypeaks') uses the peaks function to identify the
-            % innermost block of contiguous levels following a detectable density
-            % jump.
-            %
-            % CORE_radius(rhoc) where x is a numeric scalar returns the radius
-            % of the outermost level surface with density greater than rhoc.
-            %
-            % Note: the TOFPlanet property R_core is obtained with the call
-            %       rcore = obj.core_radius(obj.rhoc);
+            how = validatestring(lower(how),{'byeos','byrho','byz'});
             
-            if nargin == 1 && nargout == 0
-                help TOFPlanet.core_radius
-                return
-            end
-            if isnumeric(how)
-                validateattributes(how,{'numeric','preal'},{'positive','scalar'})
-                if how < 0.5*obj.rhobar
-                    warning('Are you using the right density units?')
-                end
-            else
-                how = validatestring(how,{'byeos','bypeaks'});
-            end
             switch how
                 case 'byeos'
                     % Define core as innermost contiguous block of same eos
@@ -428,20 +362,59 @@ classdef TOFPlanet < handle
                     cind = find(~ind, 1, 'last') + 1;
                     if isempty(cind)
                         rcore = 0;
+                        mcore = 0;
+                        icore = 0;
                     else
                         if zlay, cind = cind + 1; end
-                        rcore = obj.si(cind);
+                        icore = cind;
+                        rcore = obj.si(icore);
+                        mcore = obj.mi(icore);
                     end
-                case 'bypeaks'
+                case 'byrho'
                     % Define core using a density jump
                     dvec = double(obj.rhoi/obj.rhobar)';
-                    deltas = [dvec(1), diff(dvec)];
+                    deltas = diff(dvec);
                     cind = peakfinder(deltas);
-                    rcore = obj.si(cind(end));
-                otherwise
-                    cind = find(obj.rhoi > how, 1, 'first');
-                    rcore = obj.si(cind);
-                    if isempty(rcore), rcore = 0*obj.u.m; end
+                    if isempty(cind)
+                        rcore = 0;
+                        mcore = 0;
+                        icore = 0;
+                    else
+                        icore = cind(end)+1;
+                        rcore = obj.si(icore);
+                        mcore = obj.mi(icore);
+                        if isempty(obj.rhoc)
+                            error('obj.rhoc not set; set to zero to ignore.')
+                        end
+                        if obj.rhoi(icore) < obj.rhoc
+                            icore = 0;
+                            rcore = 0;
+                            mcore = 0;
+                        end
+                    end
+                case 'byz'
+                    % Define core using Z jump
+                    zvec = double(obj.zi);
+                    zvec(~isfinite(zvec)) = 0;
+                    deltas = diff(zvec);
+                    cind = peakfinder(deltas(2:end)); % first layer often noisy
+                    if isempty(cind)
+                        icore = 0;
+                        rcore = 0;
+                        mcore = 0;
+                    else
+                        icore = cind(end)+2; % remember deltas "lost" 2 layers
+                        rcore = obj.si(icore);
+                        mcore = obj.mi(icore);
+                        if isempty(obj.zeec)
+                            error('obj.zeec not set; set to zero to ignore.')
+                        end
+                        if obj.zi(icore) < obj.zeec
+                            icore = 0;
+                            rcore = 0;
+                            mcore = 0;
+                        end
+                    end
             end
         end
         
@@ -1085,6 +1058,17 @@ classdef TOFPlanet < handle
             val(2:end) = val(1) + cumsum(-rho.*diff(U));
         end
         
+        function val = get.Ki(obj)
+            P = obj.Pi;
+            ro = obj.rhoi;
+            if isempty(P) || isempty(ro)
+                val = [];
+            else
+                dPdro = sdderiv(ro,P);
+                val = ro.*dPdro;
+            end
+        end
+        
         function set.eos(obj,val)
             if isempty(val)
                 obj.eos = [];
@@ -1194,16 +1178,18 @@ classdef TOFPlanet < handle
         end
         
         function val = get.M_core(obj)
+            if isempty(obj.zeec), val = []; return, end
             try
-                val = obj.core_mass(obj.rhoc);
+                [~,val,~] = obj.locate_core('byz');
             catch
                 val = [];
             end
         end
         
         function val = get.R_core(obj)
+            if isempty(obj.zeec), val = []; return, end
             try
-                val = obj.core_radius(obj.rhoc);
+                [val,~,~] = obj.locate_core('byz');
             catch
                 val = [];
             end
