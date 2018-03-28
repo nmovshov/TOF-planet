@@ -679,6 +679,73 @@ classdef TOFPlanet < handle
             gh.FontSize = 11;
         end
         
+        function [ah, lh, gh] = plot_Z_of_r(obj, varargin)
+            % Plot Z(r) where r is mean radius.
+            
+            % Don't bother if uninitialized
+            zvec = obj.zi;
+            if isempty(zvec)
+                warning('Level z value not found; set bgeos, fgeos, P0, and zeec fields.')
+                return
+            end
+            
+            % Input parsing
+            p = inputParser;
+            p.FunctionName = mfilename;
+            p.addParameter('axes', [], @(x)isscalar(x) && isgraphics(x, 'axes'))
+            p.addParameter('plottype', 'line', @(x)isrow(x) && ischar(x))
+            p.parse(varargin{:})
+            pr = p.Results;
+            
+            % Prepare the canvas
+            if isempty(pr.axes)
+                fh = figure;
+                set(fh, 'defaultTextInterpreter', 'latex')
+                set(fh, 'defaultLegendInterpreter', 'latex')
+                ah = axes;
+                hold(ah, 'on')
+            else
+                ah = pr.axes;
+                hold(ah, 'on')
+            end
+            
+            % Prepare the data
+            x = [double(obj.si/obj.s0); 0];
+            y = double([zvec; zvec(end)]);
+            
+            % Plot the lines
+            if isequal(lower(pr.plottype), 'stairs')
+                lh = stairs(x, y);
+            elseif isequal(lower(pr.plottype), 'line')
+                lh = line(x, y);
+            else
+                error('Unknown value of parameter plottype.')
+            end
+            lh.LineWidth = 2;
+            if isempty(pr.axes)
+                lh.Color = [0.31, 0.31, 0.31];
+            end
+            if isempty(obj.name)
+                lh.DisplayName = sprintf('using %s',obj.fgeos.name);
+            else
+                lh.DisplayName = obj.name;
+            end
+            
+            % Style and annotate axes
+            if isempty(pr.axes)
+                ah.Box = 'on';
+                xlabel('Level surface radius, $s/s_0$', 'fontsize', 12)
+                ylabel('$Z$', 'fontsize', 12)
+            else
+                xlim('auto')
+            end
+            
+            % Legend
+            legend(ah, 'off')
+            gh = legend(ah, 'show','location','ne');
+            gh.FontSize = 11;
+        end
+        
         function [ah, lh, gh] = plot_P_of_r(obj, varargin)
             % Plot P(r) where r is mean radius.
             
