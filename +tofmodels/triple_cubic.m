@@ -16,7 +16,7 @@ function tof = triple_cubic(N, x, zstrat, forcemono)
 %    interval (0, 1], for normalized mean level radii.
 %
 %    TRIPLE_CUBIC(...,forcemono) where forcemono==true forces the resulting
-%    density profile to be monotonically nonincreasing. Default forcemono is false.
+%    density profile to be monotonically nonincreasing. Default forcemono is true.
 
 if nargin == 0 && nargout == 0
     help('tofmodels.triple_cubic')
@@ -24,7 +24,7 @@ if nargin == 0 && nargout == 0
 end
 narginchk(2,4)
 if ((nargin < 3) || isempty(zstrat)), zstrat = @zvecs.best; end
-if ((nargin < 4) || isempty(forcemono)), forcemono = false; end
+if ((nargin < 4) || isempty(forcemono)), forcemono = true; end
 validateattributes(N, {'numeric'},{'positive','integer'},'','N',1)
 validateattributes(x, {'numeric'},{'real','vector','numel',13},2)
 validateattributes(zstrat, {'function_handle'},{},'','zstrat',3)
