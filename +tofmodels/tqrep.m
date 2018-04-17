@@ -17,7 +17,7 @@ function tof = tqrep(N, x, zstrat, forcemono)
 %    normalized mean level radii.
 %
 %    TQREP(...,forcemono) where forcemono==true forces the resulting density
-%    profile to be monotonically nonincreasing. Default forcemono is false.
+%    profile to be monotonically nonincreasing. Default forcemono is true.
 
 if nargin == 0 && nargout == 0
     help('tofmodels.tqrep')
@@ -25,7 +25,7 @@ if nargin == 0 && nargout == 0
 end
 narginchk(2,4)
 if ((nargin < 3) || isempty(zstrat)), zstrat = @zvecs.best; end
-if ((nargin < 4) || isempty(forcemono)), forcemono = false; end
+if ((nargin < 4) || isempty(forcemono)), forcemono = true; end
 validateattributes(N,{'numeric'},{'positive','integer'},'','N',1)
 validateattributes(x,{'numeric'},{'real','vector','numel',9},2)
 validateattributes(zstrat,{'function_handle'},{},'','zstrat',3)
@@ -46,6 +46,10 @@ a1 = x(1); rot1 = x(2);
 a2 = x(3); rot2 = x(4); roc2 = x(5);
 a3 = x(6); roc3 = x(7);
 rt = x(8); rc = x(9);
+if forcemono
+    rot2 = max(rot2, rot1);
+    roc3 = max(roc3, roc2);
+end
 
 % Upper envelope region
 b1 = rot1/(rt - 1) - a1*(rt + 1);
@@ -74,7 +78,6 @@ for k=1:N
 end
 
 if forcemono
-    dvec(1) = max(dvec(1), 0);
     for k=2:N
         dvec(k) = max(dvec(k), dvec(k-1));
     end
