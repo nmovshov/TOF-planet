@@ -3,3 +3,5 @@
 *.swp
 *.asv
 *.log.*
+.vscode
+__pycache__
