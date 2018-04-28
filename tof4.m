@@ -23,11 +23,16 @@ assert(length(zvec) == length(dvec),...
     'length(zvec)=%d~=%d=length(dvec)',length(zvec),length(dvec))
 [zvec, I] = sort(zvec);
 dvec = dvec(I);
-assert(zvec(end) == 1,['Are you using dimensioned variables? ',...
-    'Normalize radii to the outer radius and densities to the mean density.']);
 zvec = zvec(:); % now it's a column for sure
 dvec = dvec(:); % now it's a column for sure
 if zvec(1) == 0, zvec(1) = eps; end
+
+%% Normalize radii and density
+dro = [dvec(end); diff(flipud(dvec))];
+m = sum(dro.*flipud(zvec).^3);
+robar = m/zvec(end)^3;
+zvec = zvec/zvec(end);
+dvec = dvec/robar;
 
 %% Initialize local variables
 if nargin < 6 || isempty(fieldnames(ss_guesses))
@@ -48,16 +53,16 @@ Js = [0, 0, 0, 0, 0]; % J0=0 ensures at least one iteration
 for iter=1:maxiter
     % Equations B.16-B.17
     fs = B1617(ss);
-    
+
     % Equation B.9
     SS = B9(zvec, dvec, fs);
-    
+
     % And finally, the system of simultaneous equations B.12-B.15.
     ss = solve_B1215(ss, SS, mrot);
-    
+
     % The Js, by eqs. B.1 and B.11
     [new_Js, a0] = B111(ss, SS);
-    
+
     % Check for convergence to terminate
     dJs = abs(Js - new_Js)./abs(Js+eps);
     if all(dJs < tol)
@@ -132,7 +137,7 @@ N = length(Z); % x(N) is faster than x(end)
 % for k=2:N
 %     m(k) = m(k-1) + 4*pi/3*D(k)*(Z(k)^3 - Z(k-1)^3);
 % end
-% 
+%
 % SS.S0 = m./(m(N)*Z.^3);
 
 I0 = cumtrapz(D, Z.^(0+3).*fs.f0);
@@ -291,7 +296,7 @@ defaultopt = struct(...
     'FunValCheck','off',...
     'InitDamping', 0.01, ...
     'Jacobian','off',...
-    'JacobMult',[],... 
+    'JacobMult',[],...
     'JacobPattern','sparse(ones(Jrows,Jcols))',...
     'MaxFunEvals',[],...
     'MaxIter',400,...
@@ -301,7 +306,7 @@ defaultopt = struct(...
     'PrecondBandWidth',Inf,...
     'ScaleProblem','none',...
     'TolFun', 1e-6,...
-    'TolFunValue', 1e-6, ...    
+    'TolFunValue', 1e-6, ...
     'TolPCG',0.1,...
     'TolX',1e-6,...
     'TypicalX','ones(numberOfVariables,1)', ...
@@ -316,18 +321,18 @@ function [x,FVAL,EXITFLAG,OUTPUT,JACOB] = fsolve(FUN,x,options,varargin)
 %FSOLVE solves systems of nonlinear equations of several variables.
 %
 %   FSOLVE attempts to solve equations of the form:
-%             
-%   F(X) = 0    where F and X may be vectors or matrices.   
+%
+%   F(X) = 0    where F and X may be vectors or matrices.
 %
 %   FSOLVE implements three different algorithms: trust region dogleg,
 %   trust region, and Levenberg-Marquardt. Choose one via the option
 %   Algorithm: for instance, to choose trust region, set OPTIONS =
 %   optimoptions('fsolve','Algorithm','trust-region'), and then pass
 %   OPTIONS to FSOLVE.
-%    
-%   X = FSOLVE(FUN,X0) starts at the matrix X0 and tries to solve the 
-%   equations in FUN.  FUN accepts input X and returns a vector (matrix) of 
-%   equation values F evaluated at X. 
+%
+%   X = FSOLVE(FUN,X0) starts at the matrix X0 and tries to solve the
+%   equations in FUN.  FUN accepts input X and returns a vector (matrix) of
+%   equation values F evaluated at X.
 %
 %   X = FSOLVE(FUN,X0,OPTIONS) solves the equations with the default
 %   optimization parameters replaced by values in OPTIONS, an argument
@@ -342,11 +347,11 @@ function [x,FVAL,EXITFLAG,OUTPUT,JACOB] = fsolve(FUN,x,options,varargin)
 %   X = FSOLVE(PROBLEM) solves system defined in PROBLEM. PROBLEM is a
 %   structure with the function FUN in PROBLEM.objective, the start point
 %   in PROBLEM.x0, the options structure in PROBLEM.options, and solver
-%   name 'fsolve' in PROBLEM.solver.  Use this syntax to solve at the 
-%   command line a problem exported from OPTIMTOOL. 
+%   name 'fsolve' in PROBLEM.solver.  Use this syntax to solve at the
+%   command line a problem exported from OPTIMTOOL.
 %
-%   [X,FVAL] = FSOLVE(FUN,X0,...) returns the value of the equations FUN 
-%   at X. 
+%   [X,FVAL] = FSOLVE(FUN,X0,...) returns the value of the equations FUN
+%   at X.
 %
 %   [X,FVAL,EXITFLAG] = FSOLVE(FUN,X0,...) returns an EXITFLAG that
 %   describes the exit condition. Possible values of EXITFLAG and the
@@ -362,15 +367,15 @@ function [x,FVAL,EXITFLAG,OUTPUT,JACOB] = fsolve(FUN,x,options,varargin)
 %    -2  Converged to a point that is not a root.
 %    -3  Trust region radius too small (Trust-region-dogleg).
 %
-%   [X,FVAL,EXITFLAG,OUTPUT] = FSOLVE(FUN,X0,...) returns a structure 
-%   OUTPUT with the number of iterations taken in OUTPUT.iterations, the 
-%   number of function evaluations in OUTPUT.funcCount, the algorithm used 
-%   in OUTPUT.algorithm, the number of CG iterations (if used) in 
-%   OUTPUT.cgiterations, the first-order optimality (if used) in 
+%   [X,FVAL,EXITFLAG,OUTPUT] = FSOLVE(FUN,X0,...) returns a structure
+%   OUTPUT with the number of iterations taken in OUTPUT.iterations, the
+%   number of function evaluations in OUTPUT.funcCount, the algorithm used
+%   in OUTPUT.algorithm, the number of CG iterations (if used) in
+%   OUTPUT.cgiterations, the first-order optimality (if used) in
 %   OUTPUT.firstorderopt, and the exit message in OUTPUT.message.
 %
-%   [X,FVAL,EXITFLAG,OUTPUT,JACOB] = FSOLVE(FUN,X0,...) returns the 
-%   Jacobian of FUN at X.  
+%   [X,FVAL,EXITFLAG,OUTPUT,JACOB] = FSOLVE(FUN,X0,...) returns the
+%   Jacobian of FUN at X.
 %
 %   Examples
 %     FUN can be specified using @:
@@ -385,18 +390,18 @@ function [x,FVAL,EXITFLAG,OUTPUT,JACOB] = fsolve(FUN,x,options,varargin)
 %
 %       x = fsolve(@(x) sin(3*x),[1 4],optimoptions('fsolve','Display','off'))
 %
-%   If FUN is parameterized, you can use anonymous functions to capture the 
-%   problem-dependent parameters. Suppose you want to solve the system of 
-%   nonlinear equations given in the function myfun, which is parameterized 
+%   If FUN is parameterized, you can use anonymous functions to capture the
+%   problem-dependent parameters. Suppose you want to solve the system of
+%   nonlinear equations given in the function myfun, which is parameterized
 %   by its second argument c. Here myfun is a MATLAB file function such as
-%     
+%
 %       function F = myfun(x,c)
 %       F = [ 2*x(1) - x(2) - exp(c*x(1))
 %             -x(1) + 2*x(2) - exp(c*x(2))];
-%           
-%   To solve the system of equations for a specific value of c, first 
-%   assign the value to c. Then create a one-argument anonymous function 
-%   that captures that value of c and calls myfun with two arguments. 
+%
+%   To solve the system of equations for a specific value of c, first
+%   assign the value to c. Then create a one-argument anonymous function
+%   that captures that value of c and calls myfun with two arguments.
 %   Finally, pass this anonymous function to FSOLVE:
 %
 %       c = -1; % define parameter first
@@ -419,7 +424,7 @@ defaultopt = struct(...
     'FunValCheck','off',...
     'InitDamping', 0.01, ...
     'Jacobian','off',...
-    'JacobMult',[],... 
+    'JacobMult',[],...
     'JacobPattern','sparse(ones(Jrows,Jcols))',...
     'MaxFunEvals',[],...
     'MaxIter',400,...
@@ -429,7 +434,7 @@ defaultopt = struct(...
     'PrecondBandWidth',Inf,...
     'ScaleProblem','none',...
     'TolFun', 1e-6,...
-    'TolFunValue', 1e-6, ...    
+    'TolFunValue', 1e-6, ...
     'TolPCG',0.1,...
     'TolX',1e-6,...
     'TypicalX','ones(numberOfVariables,1)', ...
@@ -530,7 +535,7 @@ mtxmpy = optimget(options,'JacobMult',defaultopt,'fast');
 % Check if name clash
 functionNameClashCheck('JacobMult',mtxmpy,'atamult','optim:fsolve:JacobMultNameClash');
 
-% Use internal Jacobian-multiply function if user does not provide JacobMult function 
+% Use internal Jacobian-multiply function if user does not provide JacobMult function
 % or options.Jacobian is off
 if isempty(mtxmpy) || (~strcmpi(funfcn{1},'fungrad') && ~strcmpi(funfcn{1},'fun_then_grad'))
     mtxmpy = @atamult;
@@ -578,7 +583,7 @@ switch funfcn{1}
         error(message('optim:fsolve:UndefinedCalltype'))
 end
 
-% Check for non-double data typed values returned by user functions 
+% Check for non-double data typed values returned by user functions
 if ~isempty( isoptimargdbl('FSOLVE', {'F','J'}, fuser, JAC) )
     error('optim:fsolve:NonDoubleFunVal',getString(message('optimlib:commonMsgs:NonDoubleFunVal','FSOLVE')));
 end
@@ -617,9 +622,9 @@ end
 confcn = {''};
 if diagnostics
     % Do diagnostics on information so far
-    constflag = false; gradconstflag = false; hessflag = false; 
+    constflag = false; gradconstflag = false; hessflag = false;
     non_eq = 0;non_ineq = 0;lin_eq = 0;lin_ineq = 0;
-   
+
     % Set OUTPUT.algorithm for diagnostics
      switch algorithmflag
          case 1
@@ -658,7 +663,7 @@ finDiffFlags.chkComplexObj = false;  % Don't check whether objective function va
 finDiffFlags.isGrad = false;         % Compute Jacobian, not gradient
 finDiffFlags.hasLBs = false(sizes.nVar,1);  % No bounds
 finDiffFlags.hasUBs = false(sizes.nVar,1);
-% finDiffFlags.chkFunEval will be set below according to 
+% finDiffFlags.chkFunEval will be set below according to
 % where finDiffFlags.chkFunEval will be used.
 
 % Check derivatives
@@ -685,19 +690,19 @@ if algorithmflag == 1   % trust-region
     % Set MaxFunEvals appropriately for trust-region
     defaultopt.MaxFunEvals = '100*numberOfVariables';
     % Don't check function values during finite differences
-    finDiffFlags.chkFunEval = false;     
+    finDiffFlags.chkFunEval = false;
     [x,FVAL,~,JACOB,EXITFLAG,OUTPUT,msgData]=...
         snls(funfcn,x,LB,UB,verbosity,options,defaultopt,f,JAC,caller,Jstr,...
         computeLambda,mtxmpy,detailedExitMsg,optionFeedback,finDiffFlags,varargin{:});
-    
+
     % Correct the algorithm name stored in snls
     OUTPUT.algorithm = 'trust-region';
-elseif algorithmflag == 2   % trust-region dogleg    
+elseif algorithmflag == 2   % trust-region dogleg
     % Set MaxFunEvals appropriately for trust-region-dogleg
     defaultopt.MaxFunEvals = '100*numberOfVariables';
     % Check function values during finite differences
-    finDiffFlags.chkFunEval = true;    
-    
+    finDiffFlags.chkFunEval = true;
+
     [x,FVAL,JACOB,EXITFLAG,OUTPUT,msgData]=...
         trustnleqn(funfcn,x,verbosity,gradflag,options,defaultopt,f,JAC,...
         detailedExitMsg,optionFeedback,finDiffFlags,sizes,varargin{:});
@@ -705,8 +710,8 @@ elseif algorithmflag == 3   % Levenberg-Marquardt
     % Set MaxFunEvals appropriately for LM
     defaultopt.MaxFunEvals = '200*numberOfVariables';
     % Check function values during finite differences
-    finDiffFlags.chkFunEval = true;    
-    
+    finDiffFlags.chkFunEval = true;
+
     [x,FVAL,JACOB,EXITFLAG,OUTPUT,msgData] = ...
         levenbergMarquardt(funfcn,x,verbosity,options,defaultopt,f,JAC,caller, ...
         initLMparam,detailedExitMsg,optionFeedback,finDiffFlags,varargin{:});
@@ -720,7 +725,7 @@ if EXITFLAG > 0 % if we think we converged:
     if Resnorm > sqrtTolFunValue
         msgData = internalFlagForExitMessage(algorithmflag == 2,msgData,EXITFLAG);
         EXITFLAG = -2;
-    end  
+    end
     %OUTPUT.message = createExitMsg(msgData{:},Resnorm,optionFeedback.TolFunValue,sqrtTolFunValue);
     OUTPUT.message = msgData;
 else
@@ -752,9 +757,9 @@ function [x,Fvec,JAC,EXITFLAG,OUTPUT,msgData]= trustnleqn(funfcn,x,verbosity,gra
 %
 %   TRUSTNLEQN solves a system of nonlinear equations using a dogleg trust
 %   region approach.  The algorithm implemented is similar in nature
-%   to the FORTRAN program HYBRD1 of J.J. More', B.S. Garbow and K.E. 
-%   Hillstrom, User Guide for MINPACK 1, Argonne National Laboratory, 
-%   Rept. ANL-80-74, 1980, which itself was based on the program CALFUN 
+%   to the FORTRAN program HYBRD1 of J.J. More', B.S. Garbow and K.E.
+%   Hillstrom, User Guide for MINPACK 1, Argonne National Laboratory,
+%   Rept. ANL-80-74, 1980, which itself was based on the program CALFUN
 %   of M.J.D. Powell, A Fortran subroutine for solving systems of
 %   nonlinear algebraic equations, Chap. 7 in P. Rabinowitz, ed.,
 %   Numerical Methods for Nonlinear Algebraic Equations, Gordon and
@@ -766,14 +771,14 @@ function [x,Fvec,JAC,EXITFLAG,OUTPUT,msgData]= trustnleqn(funfcn,x,verbosity,gra
 %       'Fvec' passed in and returned in vector form.
 %
 % Throughout this routine 'x' and 'F' are matrices while
-% 'xvec', 'xTrial', 'Fvec' and 'FTrial' are vectors. 
+% 'xvec', 'xTrial', 'Fvec' and 'FTrial' are vectors.
 % This was done for compatibility with the 'fsolve.m' interface.
 
 % Check to see if the function vector and user-supplied Jacobian at the
 % initial point are Inf or NaN. If not, then terminate immediately.
 % NOTE: complex values are ok in equation solving.
-if any(~isfinite(Fvec)) 
-    error(message('optim:trustnleqn:UsrObjUndefAtX0'));    
+if any(~isfinite(Fvec))
+    error(message('optim:trustnleqn:UsrObjUndefAtX0'));
 end
 if any(~isfinite(nonzeros(JAC)))
     caller = 'fsolve';
@@ -784,7 +789,7 @@ end
 % Define some sizes.
 xvec = x(:);         % vector representation of x
 % Convert values to full to avoid unnecessary sparse operation overhead
-Fvec = full(Fvec); 
+Fvec = full(Fvec);
 
 % Get user-defined options.
 [maxfunc,maxit,tolf,tolfunvalue,tolx,giventypx,outputfcn,plotfcns] = ...
@@ -822,7 +827,7 @@ end
 
 % Initialize local arrays.
 d       = zeros(sizes.nVar,1);
-scalMat = ones(sizes.nVar,1); 
+scalMat = ones(sizes.nVar,1);
 
 % Initialize some trust region parameters.
 Delta    = 1e0;
@@ -839,7 +844,7 @@ if gradflag
   numJevals = 1; % computed in fsolve.m
 else
   numJevals = 0;
-end 
+end
 stepAccept = true;
 normd = 0.0e0;
 scalemin = eps;
@@ -862,18 +867,18 @@ if ~gradflag
     JACfindiff = zeros(sizes.nFun,sizes.nVar); % pre-allocate derivative array
     % Set flags so that finite differences will validate gradient at x0
     % (only at x0, no validation of gradients a subsequent iterates).
-    finDiffFlagsX0 = finDiffFlags; 
+    finDiffFlagsX0 = finDiffFlags;
     finDiffFlagsX0.chkFunEval = true; % validate function values for grad at x0
-   
+
     [JACfindiff,~,~,numFDfevals,evalOK] = computeFinDiffGradAndJac(x,funfcn,confcn,Fvec, ...
         [],[],JACfindiff,[],[],-Inf*ones(sizes.nVar,1),Inf*ones(sizes.nVar,1),[],options,finDiffFlagsX0,sizes,varargin{:});
-    
+
     if ~evalOK
-        caller = 'fsolve';        
+        caller = 'fsolve';
         error('optim:trustnleqn:DerivUndefAtX0', ...
             getString(message('optimlib:commonMsgs:FinDiffJacUndefAtX0',caller)));
     end
-    
+
     % Set initial Jacobian to be the finite difference approximation.
     JAC = JACfindiff;
 end
@@ -909,7 +914,7 @@ if scale
   if giventypx && ~isempty(typx) % scale based on typx values
     typx(typx==0) = 1; % replace any zero entries with ones
     scalMat = 1./abs(typx);
-  else         % scale based on norm of the Jacobian (not currently active)  
+  else         % scale based on norm of the Jacobian (not currently active)
     scalMat = getscalMat(sizes.nVar,JAC,scalemin,scalemax);
   end
 end
@@ -963,13 +968,13 @@ while ~done
     [F,JACTrial] = feval(funfcn{3},reshape(xTrial,sizes.xShape),varargin{:});
     numJevals = numJevals + 1;
   case 'fun_then_grad'
-    F = feval(funfcn{3},reshape(xTrial,sizes.xShape),varargin{:}); 
+    F = feval(funfcn{3},reshape(xTrial,sizes.xShape),varargin{:});
   otherwise
     error(message('optim:trustnleqn:UndefinedCalltype'))
-  end  
+  end
   numFevals = numFevals + 1;
   FTrial = full(F(:)); % make FTrial a vector, convert to full
-  objTrial = 0.5*(FTrial'*FTrial); 
+  objTrial = 0.5*(FTrial'*FTrial);
 
   % Compute the actual reduction given by xTrial (ared).
   ared = obj - objTrial;
@@ -980,11 +985,11 @@ while ~done
   else
     ratio = ared/pred;
   end
-  
+
   % Update fault tolerance structure.
   faultTolStruct = updateFaultTolStruct(faultTolStruct, objTrial, ...
       verbosity > 1);
-  
+
   if haveoutputfcn % Call output functions (we don't call plot functions with 'interrupt' flag)
       [~, ~, stop] = callOutputAndPlotFcns(outputfcn,{},xvec,xOutputfcn,'interrupt',iter, ...
           numFevals,Fvec,normd,grad,normgradinf,Delta,stepAccept,varargin{:});
@@ -994,7 +999,7 @@ while ~done
           return;
       end
   end
-  
+
   if ratio > eta1 && faultTolStruct.currTrialWellDefined % accept step.
 
     xvec = xTrial; Fvec = FTrial; objold = obj; obj = objTrial;
@@ -1006,7 +1011,7 @@ while ~done
 
         [JACfindiff,~,~,numFDfevals,evalOK] = computeFinDiffGradAndJac(x,funfcn,confcn,Fvec, ...
             [],[],JACfindiff,[],[],-Inf*ones(sizes.nVar,1),Inf*ones(sizes.nVar,1),[],options,finDiffFlags,sizes,varargin{:});
-        
+
         numFevals = numFevals + numFDfevals;
     end
 
@@ -1021,7 +1026,7 @@ while ~done
         otherwise
             error(message('optim:trustnleqn:UndefinedCalltype'))
     end
-      
+
     grad = JAC'*Fvec;
     normgradinf = norm(grad,inf);
 
@@ -1033,7 +1038,7 @@ while ~done
     stepAccept = true;
   else % reject step.
     stepAccept = false;
-  end 
+  end
 
   % Print iteration statistics.
   if verbosity > 1
@@ -1064,11 +1069,11 @@ while ~done
   [done,EXITFLAG,msgData] = testStop(normgradinf,tolf,tolfunvalue,tolx,...
        stepAccept,iter,evalOK,maxit,numFevals,maxfunc,Delta,normd,...
        obj,objold,d,xvec,detailedExitMsg,optionFeedback,verbosity);
-   
+
   % As the iteration has been completed, the fault tolerance
   % structure needs to be reset.
   faultTolStruct = newFaultTolStruct;
-   
+
 end
 
 if haveoutputfcn || haveplotfcn
@@ -1109,7 +1114,7 @@ tolx = optimget(options,'TolX',defaultopt,'fast');
 outputfcn = optimget(options,'OutputFcn',defaultopt,'fast');
 plotfcns = optimget(options,'PlotFcns',defaultopt,'fast');
 
-% Check if TypicalX is the default (ones) 
+% Check if TypicalX is the default (ones)
 giventypx = any(options.TypicalX ~= 1);
 end
 
@@ -1125,7 +1130,7 @@ msgData = {};
 
 % Check termination criteria.
 if ~evalOK
-    EXITFLAG = 2; 
+    EXITFLAG = 2;
     msgFlag = 26;
     msgData = {'trustnleqn',msgFlag,verbosity > 0,detailedExitMsg,'fsolve', ...
         [], [], [], [], [], []};
@@ -1190,7 +1195,7 @@ elseif numFevals >= maxfunc
   msgData = {'trustnleqn',EXITFLAG,verbosity > 0,detailedExitMsg,'fsolve', ...
       [],optionFeedback.MaxFunEvals,maxfunc};
   done = true;
-end  
+end
 end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function Delta = updateDelta(Delta,ratio,normdscal,eta1,eta2,...
@@ -1216,7 +1221,7 @@ end
 function scalMat = getscalMat(nvar,JAC,scalemin,scalemax)
 %getscalMat computes the scaling matrix in TRUSTNLEQN.
 %
-%   getscalMat computes the scaling matrix based on the norms 
+%   getscalMat computes the scaling matrix based on the norms
 %   of the columns of the Jacobian.
 
 scalMat = ones(nvar,1);
@@ -1232,9 +1237,9 @@ end
 function [xOutputfcn, optimValues, stop] = callOutputAndPlotFcns(outputfcn,plotfcns,xvec,xOutputfcn,state,iter,numFevals, ...
     Fvec,normd,grad,normgradinf,Delta,stepAccept,varargin)
 % CALLOUTPUTANDPLOTFCNS assigns values to the struct OptimValues and then calls the
-% outputfcn/plotfcns.  
+% outputfcn/plotfcns.
 %
-% state - can have the values 'init','iter','interrupt', or 'done'. 
+% state - can have the values 'init','iter','interrupt', or 'done'.
 %
 % For the 'done' state we do not check the value of 'stop' because the
 % optimization is already done.
@@ -1242,8 +1247,8 @@ function [xOutputfcn, optimValues, stop] = callOutputAndPlotFcns(outputfcn,plotf
 optimValues.iteration = iter;
 optimValues.funccount = numFevals;
 optimValues.fval = Fvec;
-optimValues.stepsize = normd; 
-optimValues.gradient = grad; 
+optimValues.stepsize = normd;
+optimValues.gradient = grad;
 optimValues.firstorderopt = normgradinf;
 optimValues.trustregionradius = Delta;
 optimValues.stepaccept = stepAccept;
@@ -1277,20 +1282,20 @@ end
 function [x,Fvec,JAC,EXITFLAG,OUTPUT] = cleanUpInterrupt(xOutputfcn,optimValues)
 % CLEANUPINTERRUPT sets the outputs arguments to be the values at the last call
 % of the outputfcn during an 'iter' call (when these values were last known to
-% be consistent). 
+% be consistent).
 
 % Call plot function driver to finalize the plot function figure window. If
 % no plot functions have been specified or the plot function figure no
 % longer exists, this call just returns.
 callAllOptimPlotFcns('cleanuponstopsignal');
 
-x = xOutputfcn; 
+x = xOutputfcn;
 Fvec = optimValues.fval;
-EXITFLAG = -1; 
+EXITFLAG = -1;
 OUTPUT.iterations = optimValues.iteration;
 OUTPUT.funcCount = optimValues.funccount;
 OUTPUT.algorithm = 'trust-region-dogleg';
-OUTPUT.firstorderopt = optimValues.firstorderopt; 
+OUTPUT.firstorderopt = optimValues.firstorderopt;
 JAC = []; % May be in an inconsistent state
 end
 
@@ -1324,10 +1329,10 @@ if normgradscal >= eps
     tauterm = normgradscal^3/denom;
     tauC = min(1,tauterm);
     dCauchy = tauC*dCauchy;
-    
+
     % Compute quadratic objective at Cauchy point.
-    JACvec = JAC*(dCauchy./scalMat); 
-    objCauchy = gradscal'*dCauchy + 0.5*(JACvec'*JACvec);   
+    JACvec = JAC*(dCauchy./scalMat);
+    objCauchy = gradscal'*dCauchy + 0.5*(JACvec'*JACvec);
     normdCauchy = min(norm(dCauchy),Delta);
 else
     % Set Cauchy step to zero step and continue.
@@ -1349,13 +1354,13 @@ else
     % Restore the warning states to their original settings
     warning(warningstate1)
     warning(warningstate2)
-    
+
     dNewton = dNewton.*scalMat;     % scale the step
-    
+
     if any(~isfinite(dNewton))
         % Take the Cauchy step if the Gauss-Newton step gives bad values.
         step = dCauchy; quadObj = objCauchy;
-    else 
+    else
         normdNewt = norm(dNewton);
         if normdNewt <= Delta
             % Use the Newton direction as the trial step
@@ -1367,7 +1372,7 @@ else
             normdNewt2 = normdNewt^2;
             dCdN = dCauchy'*dNewton;
             dCdNdist2 = max((normdCauchy2+normdNewt2-2*dCdN),0);
-            
+
             if dCdNdist2 == 0
                 tauI = 0;
             else
@@ -1377,7 +1382,7 @@ else
                 c = 0.5*(normdCauchy2 - Delta2);
                 q = -0.5*(b + sign(b)*sqrt(b^2 - 4*a*c));
                 if b > 0
-                    tauI = c/q; 
+                    tauI = c/q;
                 else
                     tauI = q/a;
                 end
@@ -1393,7 +1398,7 @@ else
         % Compute quadratic objective at trial point.
         JACvec = JAC*(step./scalMat);
         quadObj = gradscal'*step + 0.5*(JACvec'*JACvec);
-        
+
         % Compare Cauchy step and trial step (Newton or intersection)
         if objCauchy < quadObj
             step = dCauchy; quadObj = objCauchy;
