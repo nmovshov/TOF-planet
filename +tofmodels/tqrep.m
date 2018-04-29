@@ -1,12 +1,23 @@
 function tof = tqrep(N, x, zstrat, forcemono)
 %TQREP Piecewise-quadratic density profile, reparameterized.
-%    TQREP(N, x) returns an N-point TOFPlanet object with rhoi approximated by a
-%    piecewise-quadratic function. Each quadratic segment is defined by its end
-%    points and a curvature coefficient. The uppermost segment passes through the
-%    point (1,0) and the lowermost passes through (0,1), leaving 9 free parameters
-%    ordered as follows:
+%    TQREP(N, x) returns an N-point TOFPlanet object with (normalized) rhoi
+%    approximated by a piecewise-quadratic function in (normalized) radius. Each
+%    quadratic segment is defined by its end points and a curvature coefficient.
+%    The segment breakpoints are at rt (upper) and rc (lower). The uppermost
+%    segment passes through the point (x,y)=(1,0) and the lowermost passes through
+%    (x,y)=(0,1) leaving 9 free parameters. They are ordered as follows:
 %    
-%        x = [a1, rot1, a2, rot2, roc2, a3, roc3, rt, rc]
+%        x = [a1, y1, a2, ldy21, ldy22, a3, ldy32, lrt, lrc]
+%    where
+%        a1: curvature of first segment (a1*x^2 + b1*x + c1)
+%        y1: rightlimit of rho(rt)
+%        a2: curvature of second segment (a2*x^2 + b2*x + c2)
+%        ldy21: log(leftlimit(rho(rt)) - rightlimit(rho(rt)))
+%        ldy22: log(rightlimit(rho(rc)) - leftlimit(rho(rt)))
+%        a3: curvature of third segment (a3*x^2 + b3*x + c3)
+%        ld32: log(leftlimit(rho(rc)) - rightlimit(rho(rc)))
+%        lrt: log(rt) - log(1 - rt)
+%        lrc: log(rc) - log(rt - rc)
 %    
 %    The default level spacing is one of equal radius increments between s/s0=1
 %    and s/s0=1/N.
@@ -17,7 +28,7 @@ function tof = tqrep(N, x, zstrat, forcemono)
 %    normalized mean level radii.
 %
 %    TQREP(...,forcemono) where forcemono==true forces the resulting density
-%    profile to be monotonically nonincreasing. Default forcemono is true.
+%    profile to be monotonically nonincreasing. Default forcemono is false.
 
 if nargin == 0 && nargout == 0
     help('tofmodels.tqrep')
@@ -25,14 +36,11 @@ if nargin == 0 && nargout == 0
 end
 narginchk(2,4)
 if ((nargin < 3) || isempty(zstrat)), zstrat = @zvecs.best; end
-if ((nargin < 4) || isempty(forcemono)), forcemono = true; end
+if ((nargin < 4) || isempty(forcemono)), forcemono = false; end
 validateattributes(N,{'numeric'},{'positive','integer'},'','N',1)
 validateattributes(x,{'numeric'},{'real','vector','numel',9},2)
 validateattributes(zstrat,{'function_handle'},{},'','zstrat',3)
 validateattributes(forcemono,{'logical'},{'scalar'},'','forcemono',4)
-assert(x(8)>0 && x(8)<1, 'Transition (normalized) radius must be in (0,1).')
-assert(x(9)>0 && x(9)<1, 'Second transition radius must be in (0,1).')
-assert(x(9) <= x(8), 'Second transition must come before first transition.')
 
 tof = TOFPlanet();
 
@@ -43,13 +51,10 @@ assert(all(zvec > 0) && all(zvec <= 1),...
     '@zstrat(N) must return a vector of length N with values in (0,1].')
 
 a1 = x(1); rot1 = x(2);
-a2 = x(3); rot2 = x(4); roc2 = x(5);
-a3 = x(6); roc3 = x(7);
-rt = x(8); rc = x(9);
-if forcemono
-    rot2 = max(rot2, rot1);
-    roc3 = max(roc3, roc2);
-end
+a2 = x(3); rot2 = rot1 + exp(x(4)); roc2 = rot2 + exp(x(5));
+a3 = x(6); roc3 = roc2 + exp(x(7));
+rt = exp(x(8))/(1 + exp(x(8)));
+rc = rt*exp(x(9))/(1 + exp(x(9)));
 
 % Upper envelope region
 b1 = rot1/(rt - 1) - a1*(rt + 1);
