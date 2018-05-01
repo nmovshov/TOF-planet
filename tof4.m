@@ -1,24 +1,25 @@
-function [Js, out] = tof4(zvec, dvec, mrot, tol, maxiter, ss_guesses)
+function [Js, out] = tof4(zvec, dvec, mrot, tol, maxiter, ss_guesses, sskip)
 %TOF4 Forth-order Theory of Figures gravity coefficients.
 %   Js = TOF4(zvec, dvec, mrot)
-%   Js = TOF4(zvec, dvec, mrot, tol, maxiter, ss_guesses)
+%   Js = TOF4(zvec, dvec, mrot, tol, maxiter, ss_guesses, sskip)
 
 %% Input parsing
-try
-    narginchk(3,6);
-catch ME
+if nargin == 0 && nargout == 0
     help('tof4.m')
-    rethrow(ME)
+    return
 end
+narginchk(3,7);
 if nargin < 4 || isempty(tol), tol = 1e-6; end
 if nargin < 5 || isempty(maxiter), maxiter = 100; end
 if nargin < 6 || isempty(ss_guesses), ss_guesses = struct(); end
+if nargin < 7 || isempty(sskip), sskip = 0; end
 validateattributes(zvec,{'numeric'},{'finite','nonnegative','vector'},'','zvec',1)
 validateattributes(dvec,{'numeric'},{'finite','nonnegative','vector'},'','dvec',2)
 validateattributes(mrot,{'numeric'},{'finite','nonnegative','scalar'},'','mrot',3)
 validateattributes(tol,{'numeric'},{'finite','positive','scalar'},'','tol',4)
 validateattributes(maxiter,{'numeric'},{'positive','scalar','integer'},'','maxiter',5)
 validateattributes(ss_guesses,{'struct'},{'scalar'},'','ss_guesses',6)
+validateattributes(sskip,{'numeric'},{'nonnegative','scalar','integer'},'','sskip',7)
 assert(length(zvec) == length(dvec),...
     'length(zvec)=%d~=%d=length(dvec)',length(zvec),length(dvec))
 [zvec, I] = sort(zvec);
@@ -58,7 +59,11 @@ for iter=1:maxiter
     SS = B9(zvec, dvec, fs);
 
     % And finally, the system of simultaneous equations B.12-B.15.
-    ss = solve_B1215(ss, SS, mrot);
+    if sskip == 0
+        ss = solve_B1215(ss, SS, mrot);
+    else
+        ss = skipnspline_B1215(ss, SS, mrot, zvec, sskip);
+    end
 
     % The Js, by eqs. B.1 and B.11
     [new_Js, a0] = B111(ss, SS);
@@ -197,6 +202,36 @@ parfor k=1:length(SS.S0)
     Y(k,:) = XX;
 end
 ss.s0 = Y(:,1); ss.s2 = Y(:,2); ss.s4 = Y(:,3); ss.s6 = Y(:,4); ss.s8 = Y(:,5);
+end
+
+function ss = skipnspline_B1215(ss0, SS, mrot, zvec, sskip)
+% Solve the system B.12-B.15 for unknowns s2,s4,s6,s8.
+
+opts = optimset();
+opts.TolX = 1e-10;
+opts.TolFun = 1e-10;
+opts.display = 'off';
+N = length(SS.S0);
+ind = 1:sskip:N;
+Y = nan(length(ind), 5);
+ % (temp variables for parfor slicing)
+Zs = [SS.S0(ind), SS.S2(ind), SS.S4(ind), SS.S6(ind), SS.S8(ind)];
+Zps = [SS.S0p(ind), SS.S2p(ind), SS.S4p(ind), SS.S6p(ind), SS.S8p(ind)];
+zs = [ss0.s2(ind), ss0.s4(ind), ss0.s6(ind), ss0.s8(ind)];
+parfor k=1:length(ind)
+    S = Zs(k,:);
+    Sp = Zps(k,:);
+    s0 = zs(k,:);
+    fun = @(x)B1215(x, S, Sp, mrot);
+    XX = [0, fsolve(fun, s0, opts)];
+    XX(1) = -1/5*XX(2)^2 - 2/105*XX(2)^3 - 1/9*XX(3)^2 - 2/35*XX(2)^2*XX(3);
+    Y(k,:) = XX;
+end
+ss.s0 = spline(zvec(ind), Y(:,1), zvec);
+ss.s2 = spline(zvec(ind), Y(:,2), zvec);
+ss.s4 = spline(zvec(ind), Y(:,3), zvec);
+ss.s6 = spline(zvec(ind), Y(:,4), zvec);
+ss.s8 = spline(zvec(ind), Y(:,5), zvec);
 end
 
 function A = B1215(s, S, Sp, m)

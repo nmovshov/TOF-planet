@@ -210,7 +210,7 @@ classdef TOFPlanet < handle
                 ss_guess = structfun(@flipud, obj.ss, 'UniformOutput', false);
             end
             [obj.Js, out] = tof4(zvec, dvec, obj.mrot,...
-                obj.opts.dJtol, obj.opts.MaxIterHE, ss_guess);
+                obj.opts.dJtol, obj.opts.MaxIterHE, ss_guess, obj.opts.splineskip);
             ET = toc(t_rlx);
             dJ = out.dJs;
             obj.ss = structfun(@flipud, out.ss, 'UniformOutput', false);
