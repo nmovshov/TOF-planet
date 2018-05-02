@@ -8,7 +8,7 @@ import sys
 import numpy as np
 import warnings
 
-def tof4(zvec, dvec, mrot, tol=1e-6, maxiter=100):
+def tof4(zvec, dvec, mrot, tol=1e-6, maxiter=100, sskip=0):
     """Return gravity coefficients of mass distribution in hydrostatic equilibrium.
 
     Parameters
@@ -20,6 +20,8 @@ def tof4(zvec, dvec, mrot, tol=1e-6, maxiter=100):
         non-increasing with z, but this is not enforced.
     mrot : float, scalar, nonnegative
         Dimensionless rotation parameter.
+    sskip : integer, nonnegative
+        skip-n-spline step size
     """
 
     # Minimal input control (some day)
@@ -27,6 +29,7 @@ def tof4(zvec, dvec, mrot, tol=1e-6, maxiter=100):
     dvec = np.array(dvec)
     assert zvec.shape == dvec.shape
     assert mrot >= 0
+    assert sskip >= 0
     pass
 
     # Initialize local variables
@@ -55,7 +58,10 @@ def tof4(zvec, dvec, mrot, tol=1e-6, maxiter=100):
         SS = B9(zvec, dvec, fs)
 
         # And finally, the system of simultaneous equations B.12-B.15.
-        ss = solve_B1215(ss, SS, mrot)
+        if sskip == 0:
+            ss = solve_B1215(ss, SS, mrot)
+        else:
+            ss = skipnspline_B1215(ss, SS, mrot, zvec, sskip)
 
         # Now the Js, by eqs. B.1 and B.11
         new_Js, a0 = B111(ss, SS)
@@ -201,6 +207,32 @@ def solve_B1215(ss0, SS, mrot):
     ss = [s0, s2, s4, s6, s8]
     return ss
 
+def skipnspline_B1215(ss0, SS, mrot, zvec, sskip):
+    # Solve the system B.12-B.15 for unknowns s2,s4,s6,s8.
+    from scipy.optimize import fsolve
+    from scipy.interpolate import interp1d
+
+    N = len(ss0[0])
+    ind = np.arange(0, N, sskip)
+    Y = np.zeros((len(ind),5))
+    for k in range(len(ind)):
+        es0 = [x[ind[k]] for x in ss0[1:]]
+        ES = [x[ind[k]] for x in SS]
+        es = fsolve(B1215, es0, args=(ES,mrot))
+        XX = np.concatenate((np.array((0.0, )), es))
+        XX[0] = -1/5*XX[1]**2 - 2/105*XX[1]**3 - 1/9*XX[2]**2 - 2/35*XX[1]**2*XX[2]
+        Y[k,:] = XX
+        pass
+
+    X = zvec[ind]
+    s0 = interp1d(X, Y[:,0], 'cubic', fill_value='extrapolate')(zvec)
+    s2 = interp1d(X, Y[:,1], 'cubic', fill_value='extrapolate')(zvec)
+    s4 = interp1d(X, Y[:,2], 'cubic', fill_value='extrapolate')(zvec)
+    s6 = interp1d(X, Y[:,3], 'cubic', fill_value='extrapolate')(zvec)
+    s8 = interp1d(X, Y[:,4], 'cubic', fill_value='extrapolate')(zvec)
+    ss = [s0, s2, s4, s6, s8]
+    return ss
+
 def B1215(s, S, m):
     # Compute the RHS of B.12-B.15.
 
@@ -263,11 +295,12 @@ def B1215(s, S, m):
     return A
 
 def _test():
-    N = 128
+    N = 2048
     zvec = np.linspace(1, 1.0/N, N)
     dvec = np.linspace(1/N,2,N)
     mrot = 0.1
-    Js, out = tof4(zvec, dvec, mrot, 1e-5)
+    sskip = 32
+    Js, out = tof4(zvec, dvec, mrot, 1e-5, sskip=sskip)
     print("After {} iterations:".format(out.iter+1))
     print("J0 = {}".format(Js[0]))
     print("J2 = {}".format(Js[1]))
