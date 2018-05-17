@@ -1,26 +1,29 @@
 function tof = tqrep(N, x, zstrat, forcemono)
 %TQREP Piecewise-quadratic density profile, reparameterized.
-%    TQREP(N, x) returns an N-point TOFPlanet object with (normalized) rhoi
-%    approximated by a piecewise-quadratic function in (normalized) radius. Each
-%    quadratic segment is defined by its end points and a curvature coefficient.
-%    The segment breakpoints are at rt (upper) and rc (lower). The uppermost
-%    segment passes through the point (x,y)=(1,0) and the lowermost passes through
-%    (x,y)=(0,1) leaving 9 free parameters. They are ordered as follows:
+%    TQREP(N, x) returns an N-point TOFPlanet object with normalized rhoi (which
+%    we call D) approximated by a piecewise-quadratic function in normalized
+%    radius (which we call Z). Each quadratic segment is defined by its end points
+%    and a curvature coefficient. The segment breakpoints are at z1 (upper) and z2
+%    (lower). The density at z1 is d11 (the right-limit) and d21 (the
+%    left-limit). The density at z2 is d22 (the right-limit) and d32 (the
+%    left-limit). The uppermost segment passes through the point (z,d)=(1,0) and
+%    the lowermost passes through (z,d)=(0,1) leaving 9 free parameters. They are
+%    ordered as follows:
 %    
-%        x = [a1, y1, a2, ldy21, ldy22, a3, ldy32, lrt, lrc]
+%        x = [a1, y11, a2, y21, y22, a3, y32, lz1, lz2]
 %    where
 %        a1: curvature of first segment (a1*x^2 + b1*x + c1)
-%        y1: rightlimit of rho(rt)
+%        y11: log(d11) - log(1 - d11)
 %        a2: curvature of second segment (a2*x^2 + b2*x + c2)
-%        ldy21: log(leftlimit(rho(rt)) - rightlimit(rho(rt)))
-%        ldy22: log(rightlimit(rho(rc)) - leftlimit(rho(rt)))
+%        y21: log(1 - d21) - log(d21 - d11)
+%        y22: log(1 - d22) - log(d22 - d21)
 %        a3: curvature of third segment (a3*x^2 + b3*x + c3)
-%        ld32: log(leftlimit(rho(rc)) - rightlimit(rho(rc)))
-%        lrt: log(rt) - log(1 - rt)
-%        lrc: log(rc) - log(rt - rc)
+%        y32: log(1 - d32) - log(d32 - d22)
+%        lz1: log(z1) - log(1 - z1)
+%        lz2: log(z2) - log(z1 - z2)
 %    
-%    The default level spacing is one of equal radius increments between s/s0=1
-%    and s/s0=1/N.
+%    The default level spacing is one of equal radius increments between z=1 and
+%    z=1/N.
 %    
 %    TQREP(N, x, zstrat) lets you specify the zvec distribution strategy. Pass a
 %    handle to a function that takes a single scalar integer (number of layers)
@@ -50,22 +53,29 @@ assert(isnumeric(zvec) && isvector(zvec) && (numel(zvec) == N),...
 assert(all(zvec > 0) && all(zvec <= 1),...
     '@zstrat(N) must return a vector of length N with values in (0,1].')
 
-a1 = x(1); rot1 = x(2);
-a2 = x(3); rot2 = rot1 + exp(x(4)); roc2 = rot2 + exp(x(5));
-a3 = x(6); roc3 = roc2 + exp(x(7));
-rt = exp(x(8))/(1 + exp(x(8)));
-rc = rt*exp(x(9))/(1 + exp(x(9)));
+a1 = x(1); y11 = x(2);
+a2 = x(3); y21 = x(4); y22 = x(5);
+a3 = x(6); y32 = x(7);
+lz1 = x(8); lz2 = x(9);
+
+bexp = @(x)min(exp(x), realmax/10); % bounded exp to avoid overflow
+d11 = bexp(y11)/(1 + bexp(y11));
+d21 = (1 + d11*bexp(y21))/(1 + bexp(y21));
+d22 = (1 + d21*bexp(y22))/(1 + bexp(y22));
+d32 = (1 + d22*bexp(y32))/(1 + bexp(y32));
+rt = bexp(lz1)/(1 + bexp(lz1));
+rc = rt*bexp(lz2)/(1 + bexp(lz2));
 
 % Upper envelope region
-b1 = rot1/(rt - 1) - a1*(rt + 1);
+b1 = d11/(rt - 1) - a1*(rt + 1);
 c1 = -a1 - b1;
 
 % Lower envelope region
-b2 = (roc2 - rot2)/(rc - rt) - a2*(rc + rt);
-c2 = rot2 - a2*rt^2 - b2*rt;
+b2 = (d22 - d21)/(rc - rt) - a2*(rc + rt);
+c2 = d21 - a2*rt^2 - b2*rt;
 
 % Core region
-b3 = (roc3 - 1)/rc - a3*rc;
+b3 = (d32 - 1)/rc - a3*rc;
 c3 = 1;
 
 dvec = NaN(1,N);
