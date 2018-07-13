@@ -335,8 +335,8 @@ classdef TOFPlanet < handle
             %
             % Note: the TOFPlanet properties R_core and M_core are obtained with
             % the calls
-            %       [rcore,~,~] = obj.detect_core('byZ');
-            %       [~,mcore,~] = obj.detect_core('byZ');
+            %       [rcore,~,~] = obj.locate_core('byZ');
+            %       [~,mcore,~] = obj.locate_core('byZ');
             
             if nargin == 1 && nargout == 0
                 help TOFPlanet.locate_core
