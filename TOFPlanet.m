@@ -330,7 +330,10 @@ classdef TOFPlanet < handle
             % abundance (obj.zi). This jump is considered to define a core if it
             % leads to z greater than obj.zeec.
             %
-            % If a core cennot be detected for any reason the function returns
+            % LOCATE_CORE('byzeec') returns the mass below the outermost layer in
+            % the inner half of the planet where obj.zi > obj.zeec.
+            %
+            % If a core cannot be detected for any reason the function returns
             % [0,0,0].
             %
             % Note: the TOFPlanet properties R_core and M_core are obtained with
@@ -391,6 +394,23 @@ classdef TOFPlanet < handle
                             rcore = 0;
                             mcore = 0;
                         end
+                    end
+                case 'byzeec'
+                    % Define a dilute core using r/R < 0.5 & zi > zeec
+                    rvec = double(obj.si/obj.s0);
+                    zvec = double(obj.zi);
+                    if isempty(obj.zeec)
+                        error('obj.zeec not set; set to zero to ignore.')
+                    end
+                    cind = find((rvec < 0.5) & (zvec > obj.zeec), 1, 'first');
+                    if isempty(cind)
+                        icore = 0;
+                        rcore = 0;
+                        mcore = 0;
+                    else
+                        icore = cind;
+                        rcore = obj.si(icore);
+                        mcore = obj.si(icore);
                     end
                 case 'byz'
                     % Define core using Z jump
