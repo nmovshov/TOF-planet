@@ -345,7 +345,7 @@ classdef TOFPlanet < handle
                 help TOFPlanet.locate_core
                 return
             end
-            how = validatestring(lower(how),{'byeos','byrho','byz'});
+            how = validatestring(lower(how),{'byeos','byrho','byz','byzeec'});
             
             switch how
                 case 'byeos'
