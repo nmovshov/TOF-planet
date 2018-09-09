@@ -919,7 +919,7 @@ classdef TOFPlanet < handle
                 end
             end
             DIFF = (TOF1 - OBS1)./TOF1;
-            T = [T table(DIFF, 'VariableNames', {'diff'})];
+            T = [T table(DIFF, 'VariableNames', {'frac_diff'})];
         end
         
         function s = to_struct(obj, rdc, keepss)
