@@ -835,6 +835,20 @@ classdef TOFPlanet < handle
             gh = legend(ah, 'show','location','ne');
             gh.FontSize = 11;
         end
+
+        function set_observables(obj, obs)
+            % Copy physical properties from an +observables struct.
+            obj.mass = obs.M;
+            obj.radius = obs.a0;
+            obj.mrot = obs.m;
+            obj.P0 = obs.P0;
+            try
+                obj.bgeos = obs.bgeos;
+                obj.fgeos = obs.fgeos;
+            catch
+            end
+            obj.renormalize();
+        end
         
         function T = report_card(obj, obs)
             % REPORT_CARD Table summary of model's vital statistics.
