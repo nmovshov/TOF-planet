@@ -699,6 +699,81 @@ classdef TOFPlanet < handle
             gh.FontSize = 11;
         end
         
+        function [ah, lh, gh] = plot_residual_rho_of_r(obj, varargin)
+            % Plot rho(r)-rho_xy(r) using a background eos.
+            
+            % Don't bother if uninitialized
+            if isempty(obj.rhobar)
+                warning('Uninitialized object.')
+                return
+            end
+            P = obj.Pi;
+            if isempty(obj.bgeos) || isempty(P)
+                warning('Set bgeos and P0 fields.')
+                return
+            else
+                roxy = obj.bgeos.density(P);
+            end
+            
+            % Input parsing
+            p = inputParser;
+            p.FunctionName = mfilename;
+            p.addParameter('axes', [], @(x)isscalar(x) && isgraphics(x, 'axes'))
+            p.addParameter('plottype', 'line', @(x)isrow(x) && ischar(x))
+            p.parse(varargin{:})
+            pr = p.Results;
+            
+            % Prepare the canvas
+            if isempty(pr.axes)
+                fh = figure;
+                set(fh, 'defaultTextInterpreter', 'latex')
+                set(fh, 'defaultLegendInterpreter', 'latex')
+                ah = axes;
+                hold(ah, 'on')
+            else
+                ah = pr.axes;
+                hold(ah, 'on')
+            end
+            
+            % Prepare the data
+            x = [double(obj.si/obj.s0); 0];
+            y = double(obj.rhoi - roxy);
+            y = [y; y(end)];
+            
+            % Plot the lines (density in 1000 kg/m^3)
+            if isequal(lower(pr.plottype), 'stairs')
+                lh = stairs(x, y/1000);
+            elseif isequal(lower(pr.plottype), 'line')
+                lh = line(x, y/1000);
+            else
+                error('Unknown value of parameter plottype.')
+            end
+            lh.LineWidth = 2;
+            if isempty(pr.axes)
+                lh.Color = [0.31, 0.31, 0.31];
+            end
+            if isempty(obj.name)
+                lh.DisplayName = 'TOF model';
+            else
+                lh.DisplayName = obj.name;
+            end
+            
+            % Style and annotate axes
+            if isempty(pr.axes)
+                ah.Box = 'on';
+                xlabel('Level surface radius, $s/s_0$', 'fontsize', 12)
+                s = sprintf('$\\rho - \\rho_{\\mathrm{%s}}$ [1000 kg/m$^3$]',obj.bgeos.name);
+                ylabel(s, 'fontsize', 12)
+            else
+                xlim('auto')
+            end
+            
+            % Legend
+            legend(ah, 'off')
+            gh = legend(ah, 'show','location','ne');
+            gh.FontSize = 11;
+        end
+        
         function [ah, lh, gh] = plot_Z_of_r(obj, varargin)
             % Plot Z(r) where r is mean radius.
             
