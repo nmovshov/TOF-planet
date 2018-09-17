@@ -922,7 +922,6 @@ classdef TOFPlanet < handle
                 obj.fgeos = obs.fgeos;
             catch
             end
-            obj.renormalize();
         end
         
         function T = report_card(obj, obs)
