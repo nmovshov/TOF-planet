@@ -1218,7 +1218,7 @@ classdef TOFPlanet < handle
             A0 = A0 + obj.SS.S4p.*(4/9*s4 + 12/35*s2.^2);
             A0 = A0 + obj.mrot/3*(1 - 2/5*s2 - 9/35*s2.^2 - 4/35*s2.*s4 + 22/525*s2.^3);
             
-            val = -obj.G*obj.mass/obj.s0^3*obj.si.^2.*A0;
+            val = -obj.G*obj.M/obj.s0^3*obj.si.^2.*A0;
         end
                 
         function val = get.Pi(obj)
