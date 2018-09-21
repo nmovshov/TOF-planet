@@ -16,6 +16,7 @@ function options = tofset(varargin)
 %MaxIterHE - Number of iterations allowed for relaxation to equilibrium shape [ positive integer {60} ]
 %splineskip - Solve figure functions on every nth level and spline the rest [ nonnegative integer {0} ]
 %verbosity - Level of runtime messages [0 {1} 2 3 4]
+%renorm - Scale density and radius to match set values [ {true} | false ]
 %debug - Debug mode flag (use preals instead of doubles) [ true | {false} ]
 
 % If no arguments print usage and return.
@@ -34,6 +35,7 @@ p.addParameter('MaxIterBar',60,@isposintscalar)
 p.addParameter('MaxIterHE',60,@isposintscalar)
 p.addParameter('verbosity',1,@isnonnegintscalar)
 p.addParameter('debug',false,@islogicalscalar)
+p.addParameter('renorm',true,@islogicalscalar)
 p.addParameter('masmeth','layerz');
 p.addParameter('splineskip',0,@isnonnegintscalar)
 

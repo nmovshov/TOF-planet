@@ -1136,12 +1136,6 @@ classdef TOFPlanet < handle
     
     %% Private (or obsolete) methods
     methods (Access = private)
-        function beta = renormalize_density(obj)
-            beta = obj.mass/obj.M;
-            if abs(beta - 1) < 2*eps, return, end % don't renormalize a normal
-            obj.betam = beta;
-            obj.rhoi = obj.rhoi*beta;
-        end
         function y = P_ref(obj)
             U = obj.G*obj.mass/obj.s0^3*obj.si.^2.*obj.Upu();
             rho = 0.5*(obj.rhoi(1:end-1) + obj.rhoi(2:end));
