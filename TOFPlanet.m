@@ -155,6 +155,7 @@ classdef TOFPlanet < handle
                 old_ro = obj.rhoi;
                 obj.relax_to_HE();
                 obj.update_densities;
+                renorms = obj.renormalize;
                 dJs = abs((obj.Js - old_Js)./old_Js);
                 dJs = max(double(dJs(isfinite(dJs))));
                 dro = obj.rhoi./old_ro;
@@ -177,15 +178,13 @@ classdef TOFPlanet < handle
             end
             ET = toc(t_rlx);
             
+            % Record last renorm factors
+            obj.alfar = renorms(1);
+            obj.betam = renorms(2);
+            
             % Some clean up
             obj.opts.MaxIterHE = mihe;
             warning('on','TOF4:maxiter')
-            
-            % Renormalize densities, radii.
-            obj.alfar = obj.radius/obj.a0;
-            obj.si = obj.si*obj.alfar;
-            obj.betam = obj.mass/obj.M;
-            obj.rhoi = obj.rhoi*obj.betam;
             
             % Optional communication
             if (verb > 0)
