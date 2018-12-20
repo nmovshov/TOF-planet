@@ -2,8 +2,8 @@ classdef TOFPlanet < handle
     %TOFPLANET Interior model of rotating fluid planet.
     %   This class implements a model of a rotating fluid planet using Theory of
     %   Figures to calculate the hydrostatic equilibrium shape and resulting
-    %   gravity field. A TOFPlanet object is defined by a given mass, mean radius,
-    %   rotation parameter, and optionally a barotrope.
+    %   gravity field. A TOFPlanet object is defined by a given mass, equatorial
+    %   radius, rotation parameter, and optionally a barotrope.
     
     %% Properties
     properties
@@ -11,14 +11,14 @@ classdef TOFPlanet < handle
         mass   % reference mass
         radius % reference radius (equatorial!)
         P0     % reference pressure
-        si     % vector of mean radii, top down
+        si     % vector of mean radii (top down, s0=si(1) is outer radius)
         rhoi   % vector of densities on si grid
         mrot   % rotation parameter, w^2s0^3/GM
         eos    % barotrope(s) (tip: help barotropes for options)
         bgeos  % optional background barotrope
         fgeos  % optional foreground barotrope
         rhoc   % threshold density indicating possible solid core
-        zeec   % threshold Z abundance indicating posisble solid core
+        zeec   % threshold Z abundance indicating possible solid core
         opts   % holds user configurable options (tip: help tofset)
     end
     properties (SetAccess = private)
@@ -155,7 +155,6 @@ classdef TOFPlanet < handle
                 old_ro = obj.rhoi;
                 obj.relax_to_HE();
                 obj.update_densities;
-                renorms = obj.renormalize;
                 dJs = abs((obj.Js - old_Js)./old_Js);
                 dJs = max(double(dJs(isfinite(dJs))));
                 dro = obj.rhoi./old_ro;
@@ -179,6 +178,7 @@ classdef TOFPlanet < handle
             ET = toc(t_rlx);
             
             % Record last renorm factors
+            renorms = obj.renormalize;
             obj.alfar = renorms(1);
             obj.betam = renorms(2);
             
@@ -1211,7 +1211,7 @@ classdef TOFPlanet < handle
             A0 = A0 + obj.SS.S4p.*(4/9*s4 + 12/35*s2.^2);
             A0 = A0 + obj.mrot/3*(1 - 2/5*s2 - 9/35*s2.^2 - 4/35*s2.*s4 + 22/525*s2.^3);
             
-            val = -obj.G*obj.M/obj.s0^3*obj.si.^2.*A0;
+            val = -obj.G*obj.mass/obj.s0^3*obj.si.^2.*A0;
         end
                 
         function val = get.Pi(obj)
