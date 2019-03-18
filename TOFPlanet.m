@@ -176,6 +176,9 @@ classdef TOFPlanet < handle
                 iter = iter + 1;
             end
             ET = toc(t_rlx);
+            if iter > obj.opts.MaxIterBar
+                warning('TOFPLANET:maxiter','Pressure/density may not be fully converged.')
+            end
             
             % Record last renorm factors
             renorms = obj.renormalize;
