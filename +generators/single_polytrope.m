@@ -11,18 +11,16 @@ function tof = single_polytrope(N, x, zstrat)
 %    with equally spaced radii use zstrat=@(n)linspace(1,1/n,n). A collection of
 %    pre-made distributions is available in package +zvecs.
 
-try
-    narginchk(2,3)
-    if ((nargin < 3) || isempty(zstrat)), zstrat = @zvecs.best; end
-    validateattributes(N, {'numeric'}, {'positive', 'integer'}, '', 'N', 1)
-    validateattributes(x, {'numeric'}, {'vector', 'numel', 2, 'nonnegative'}, 2)
-    validateattributes(zstrat, {'function_handle'}, {}, '', 'zstrat', 3)
-catch ME
-    if nargout == 0
-        help('tofmodels.single_polytrope')
-    end
-    rethrow(ME)
+if nargin == 0
+    help generators.single_polytrope
+    return
 end
+
+narginchk(2,3)
+if ((nargin < 3) || isempty(zstrat)), zstrat = @zvecs.best; end
+validateattributes(N, {'numeric'}, {'positive', 'integer'}, '', 'N', 1)
+validateattributes(x, {'numeric'}, {'vector', 'numel', 2, 'nonnegative'}, 2)
+validateattributes(zstrat, {'function_handle'}, {}, '', 'zstrat', 3)
 
 tof = TOFPlanet();
 

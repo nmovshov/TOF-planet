@@ -18,8 +18,8 @@ function tof = triple_cubic(N, x, zstrat, forcemono)
 %    TRIPLE_CUBIC(...,forcemono) where forcemono==true forces the resulting
 %    density profile to be monotonically nonincreasing. Default forcemono is true.
 
-if nargin == 0 && nargout == 0
-    help('tofmodels.triple_cubic')
+if nargin == 0
+    help('generators.triple_cubic')
     return
 end
 narginchk(2,4)

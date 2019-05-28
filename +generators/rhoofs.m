@@ -13,22 +13,16 @@ function tof = rhoofs(svec, rhovec)
 %   two vectors. This simplifies calls to some function-functions, like fminsearch
 %   and mhsample. The first column is svec and the second column is rhovec.
 
-try
-    narginchk(1,2)
-    if nargin == 1
-        validateattributes(svec,{'numeric'},{'2d','ncols',2},1)
-        rhovec = svec(:,2);
-        svec = svec(:,1);
-    else
-        validateattributes(svec,{'numeric'},{'vector'},1)
-        validateattributes(rhovec,{'numeric'},{'vector'},2)
-        assert(length(svec) == length(rhovec), 'length(svec) ~= length(rhovec)')
-    end
-catch ME
-    if nargout == 0
-        help('tofmodels.rhoofs')
-    end
-    rethrow(ME)
+if nargin == 0, help('generators.rhoofs'), return, end
+narginchk(1,2)
+if nargin == 1
+    validateattributes(svec,{'numeric'},{'2d','ncols',2},1)
+    rhovec = svec(:,2);
+    svec = svec(:,1);
+else
+    validateattributes(svec,{'numeric'},{'vector'},1)
+    validateattributes(rhovec,{'numeric'},{'vector'},2)
+    assert(length(svec) == length(rhovec), 'length(svec) ~= length(rhovec)')
 end
 
 tof = TOFPlanet();

@@ -13,7 +13,7 @@ function tof = double_polytrope_w_core(N, x, zstrat)
 %    and s/s0=1/N, except that the transition levels are snapped to the given
 %    values, x(6) and x(7).
 
-if nargin == 0, help('tofmodels.double_polytrope_w_core'), return, end
+if nargin == 0, help('generators.double_polytrope_w_core'), return, end
 narginchk(2,3)
 if ((nargin < 3) || isempty(zstrat)), zstrat = @zvecs.best; end
 validateattributes(N, {'numeric'}, {'positive', 'integer'}, '', 'N', 1)

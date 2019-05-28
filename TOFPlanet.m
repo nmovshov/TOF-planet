@@ -32,6 +32,7 @@ classdef TOFPlanet < handle
     properties (Dependent)
         M      % calculated mass
         mi     % cumulative mass below si
+        ai     % equatorial radii on level surfaces
         zi     % mass fraction in heavy elements
         mzi    % cumulative heavy elements mass below si
         Ki     % empirical bulk modulus (rho*dP/drho)
@@ -101,6 +102,19 @@ classdef TOFPlanet < handle
                 obj.ss = ss_guesses;
             catch ME
                 warning('ss_guesses not set because:\n%s',ME.message)
+            end
+        end
+        
+        function set_observables(obj, obs)
+            % Copy physical properties from an +observables struct.
+            obj.mass = obs.M;
+            obj.radius = obs.a0;
+            obj.mrot = obs.m;
+            obj.P0 = obs.P0;
+            try
+                obj.bgeos = obs.bgeos;
+                obj.fgeos = obs.fgeos;
+            catch
             end
         end
         
@@ -439,7 +453,10 @@ classdef TOFPlanet < handle
                     end
             end
         end
-        
+    end % End of public methods block
+    
+    %% Visualizers
+    methods (Access = public)
         function [ah, lh, gh] = plot_barotrope(obj, varargin)
             % Plot P(rho) of current model and optionally of input barotrope.
             
@@ -912,20 +929,10 @@ classdef TOFPlanet < handle
             gh = legend(ah, 'show','location','ne');
             gh.FontSize = 11;
         end
-
-        function set_observables(obj, obs)
-            % Copy physical properties from an +observables struct.
-            obj.mass = obs.M;
-            obj.radius = obs.a0;
-            obj.mrot = obs.m;
-            obj.P0 = obs.P0;
-            try
-                obj.bgeos = obs.bgeos;
-                obj.fgeos = obs.fgeos;
-            catch
-            end
-        end
-        
+    end % End of visulaizers block
+    
+    %% Reporters/exporters
+    methods (Access = public)
         function T = report_card(obj, obs)
             % REPORT_CARD Table summary of model's vital statistics.
             
@@ -1134,7 +1141,7 @@ classdef TOFPlanet < handle
                 fprintf(fid,'\n');
             end
         end
-    end % End of public methods block
+    end % End of reporters/exporters block
     
     %% Private (or obsolete) methods
     methods (Access = private)
@@ -1399,6 +1406,20 @@ classdef TOFPlanet < handle
                 val = [];
             else
                 val = obj.aos*obj.s0;
+            end
+        end
+        
+        function val = get.ai(obj)
+            if isempty(obj.si) || isempty(obj.ss)
+                val = [];
+            else
+                val = ones(size(obj.si));
+                for k=1:obj.N
+                    shp = obj.ss.s0(k)*Pn(0,0) + obj.ss.s2(k)*Pn(2,0) + ...
+                        obj.ss.s4(k)*Pn(4,0) + obj.ss.s6(k)*Pn(6,0) + ...
+                        obj.ss.s8(k)*Pn(8,0);
+                    val(k) = obj.si(k)*(1 + shp);
+                end
             end
         end
         

@@ -20,21 +20,15 @@ function tof = triple_polytrope(N, x, zstrat)
 %    radii. A collection of pre-made distributions is available in package
 %    +zvecs.
 
-try
-    narginchk(2,3)
-    if ((nargin < 3) || isempty(zstrat)), zstrat = @zvecs.best; end
-    validateattributes(N, {'numeric'}, {'positive', 'integer'}, '', 'N', 1)
-    validateattributes(x, {'numeric'}, {'vector', 'numel', 8, 'nonnegative'}, 2)
-    validateattributes(zstrat, {'function_handle'}, {}, '', 'zstrat', 3)
-    assert(x(7) > 0 && x(7) < 1, 'First transition radius must be in (0,1).')
-    assert(x(8) > 0 && x(8) < 1, 'Second transition radius must be in (0,1).')
-    assert(x(8) <= x(7), 'Second transition must come before first transition.')
-catch ME
-    if nargout == 0
-        help('tofmodels.triple_polytrope')
-    end
-    rethrow(ME)
-end
+if nargin == 0, help('generators.triple_polytrope'), return, end
+narginchk(2,3)
+if ((nargin < 3) || isempty(zstrat)), zstrat = @zvecs.best; end
+validateattributes(N, {'numeric'}, {'positive', 'integer'}, '', 'N', 1)
+validateattributes(x, {'numeric'}, {'vector', 'numel', 8, 'nonnegative'}, 2)
+validateattributes(zstrat, {'function_handle'}, {}, '', 'zstrat', 3)
+assert(x(7) > 0 && x(7) < 1, 'First transition radius must be in (0,1).')
+assert(x(8) > 0 && x(8) < 1, 'Second transition radius must be in (0,1).')
+assert(x(8) <= x(7), 'Second transition must come before first transition.')
 
 tof = TOFPlanet();
 
