@@ -17,8 +17,6 @@ classdef TOFPlanet < handle
         eos    % barotrope(s) (tip: help barotropes for options)
         bgeos  % optional background barotrope
         fgeos  % optional foreground barotrope
-        rhoc   % threshold density indicating possible solid core
-        zeec   % threshold Z abundance indicating possible solid core
         opts   % holds user configurable options (tip: help tofset)
     end
     properties (SetAccess = private)
@@ -36,8 +34,6 @@ classdef TOFPlanet < handle
         zi     % mass fraction in heavy elements
         mzi    % cumulative heavy elements mass below si
         Ki     % empirical bulk modulus (rho*dP/drho)
-        M_core % estimated core mass
-        R_core % estimated core radius
         M_Z    % estimated total heavy elements mass
         s0     % calculated mean radius (another name for obj.si(1))
         a0     % calculated equatorial radius
@@ -86,7 +82,7 @@ classdef TOFPlanet < handle
     
     %% Public methods
     methods (Access = public)
-        function set_ss_guesses(obj, ss_guesses)
+        function obj = set_ss_guesses(obj, ss_guesses)
             % Supply a shape functions struct to seed relax_to_HE call.
             
             if nargin < 2, ss_guesses = []; end
@@ -105,7 +101,7 @@ classdef TOFPlanet < handle
             end
         end
         
-        function set_observables(obj, obs)
+        function obj = set_observables(obj, obs)
             % Copy physical properties from an +observables struct.
             obj.mass = obs.M;
             obj.radius = obs.a0;
@@ -322,137 +318,6 @@ classdef TOFPlanet < handle
             end
         end
         
-        function [rcore, mcore, icore] = locate_core(obj, how)
-            % Look for a solid core.
-            %
-            % [rcore, mcore, icore] = LOCATE_CORE(how) returns the estimated
-            % radius, mass, and starting level index of the planet's core. There
-            % are several options for how to decide what part of the planet, if
-            % any, is a core, and these are specified using the string argument
-            % 'how', in the following ways:
-            %
-            % LOCATE_CORE('byeos') locates the innermost contiguous block of
-            % levels associated with the same Barotrope object. This gives the
-            % correct answer, by definition, in the rare cases where the planet
-            % was constructed with a particular barotrope-based model in mind, and
-            % relaxed using obj.relax_to_barotrope instead of obj.relax_to_HE.
-            %
-            % LOCATE_CORE('byrho') attempts to identify the innermost block of
-            % contiguous levels following a detectable density jump. This block is
-            % considered to be a core if its density is higher than obj.rhoc.
-            %
-            % LOCATE_CORE('byZ') attempts to identify the innermost block of
-            % contiguous levels following a detectable jump in heavy elements
-            % abundance (obj.zi). This jump is considered to define a core if it
-            % leads to z greater than obj.zeec.
-            %
-            % LOCATE_CORE('byzeec') returns the mass below the outermost layer in
-            % the inner half of the planet where obj.zi > obj.zeec.
-            %
-            % If a core cannot be detected for any reason the function returns
-            % [0,0,0].
-            %
-            % Note: the TOFPlanet properties R_core and M_core are obtained with
-            % the calls
-            %       [rcore,~,~] = obj.locate_core('byZ');
-            %       [~,mcore,~] = obj.locate_core('byZ');
-            
-            if nargin == 1 && nargout == 0
-                help TOFPlanet.locate_core
-                return
-            end
-            how = validatestring(lower(how),{'byeos','byrho','byz','byzeec'});
-            
-            switch how
-                case 'byeos'
-                    % Define core as innermost contiguous block of same eos
-                    if isempty(obj.eos)
-                        error('Object not assigned EOS yet.')
-                    end
-                    alleos = obj.eos;
-                    if isequal(alleos(1), barotropes.ConstDensity(0))
-                        zlay = true;
-                        alleos(1) = [];
-                    else
-                        zlay = false;
-                    end
-                    ind = arrayfun(@isequal, alleos,...
-                        repmat(alleos(end), numel(alleos), 1));
-                    cind = find(~ind, 1, 'last') + 1;
-                    if isempty(cind)
-                        rcore = 0;
-                        mcore = 0;
-                        icore = 0;
-                    else
-                        if zlay, cind = cind + 1; end
-                        icore = cind;
-                        rcore = obj.si(icore);
-                        mcore = obj.mi(icore);
-                    end
-                case 'byrho'
-                    % Define core using a density jump
-                    dvec = double(obj.rhoi/obj.rhobar)';
-                    deltas = diff(dvec);
-                    cind = peakfinder(deltas);
-                    if isempty(cind)
-                        rcore = 0;
-                        mcore = 0;
-                        icore = 0;
-                    else
-                        icore = cind(end)+1;
-                        rcore = obj.si(icore);
-                        mcore = obj.mi(icore);
-                        if isempty(obj.rhoc)
-                            error('obj.rhoc not set; set to zero to ignore.')
-                        end
-                        if obj.rhoi(icore) < obj.rhoc
-                            icore = 0;
-                            rcore = 0;
-                            mcore = 0;
-                        end
-                    end
-                case 'byzeec'
-                    % Define a dilute core using r/R < 0.5 & zi > zeec
-                    rvec = double(obj.si/obj.s0);
-                    zvec = double(obj.zi);
-                    if isempty(obj.zeec)
-                        error('obj.zeec not set; set to zero to ignore.')
-                    end
-                    cind = find((rvec < 0.5) & (zvec > obj.zeec), 1, 'first');
-                    if isempty(cind)
-                        icore = 0;
-                        rcore = 0;
-                        mcore = 0;
-                    else
-                        icore = cind;
-                        rcore = obj.si(icore);
-                        mcore = obj.si(icore);
-                    end
-                case 'byz'
-                    % Define core using Z jump
-                    zvec = double(obj.zi);
-                    zvec(~isfinite(zvec)) = 0;
-                    deltas = diff(zvec);
-                    cind = peakfinder(deltas(2:end)); % first layer often noisy
-                    if isempty(cind)
-                        icore = 0;
-                        rcore = 0;
-                        mcore = 0;
-                    else
-                        icore = cind(end)+2; % remember deltas "lost" 2 layers
-                        rcore = obj.si(icore);
-                        mcore = obj.mi(icore);
-                        if isempty(obj.zeec)
-                            error('obj.zeec not set; set to zero to ignore.')
-                        end
-                        if obj.zi(icore) < obj.zeec
-                            icore = 0;
-                            rcore = 0;
-                            mcore = 0;
-                        end
-                    end
-            end
-        end
     end % End of public methods block
     
     %% Visualizers
@@ -799,7 +664,7 @@ classdef TOFPlanet < handle
             % Don't bother if uninitialized
             zvec = obj.zi;
             if isempty(zvec)
-                warning('Level z value not found; set bgeos, fgeos, P0, and zeec fields.')
+                warning('Level z value not found; set bgeos, fgeos, and P0 fields.')
                 return
             end
             
@@ -946,10 +811,9 @@ classdef TOFPlanet < handle
             end
             
             % Basic table
-            vitals = {'Mass [kg]'; 'J2'; 'J4'; 'J6'; 'J8'; 'NMoI'; '"core" mass [kg]'};
-            TOF1 = [obj.M; obj.J2; obj.J4; obj.J6; obj.J8; obj.NMoI; obj.M_core];
+            vitals = {'Mass [kg]'; 'J2'; 'J4'; 'J6'; 'J8'; 'NMoI'};
+            TOF1 = [obj.M; obj.J2; obj.J4; obj.J6; obj.J8; obj.NMoI];
             TOF1 = double(TOF1);
-            if isempty(obj.M_core), TOF1 = [TOF1; NaN]; end
             T = table(TOF1, 'RowNames', vitals);
             if ~isempty(obj.name)
                 vname = matlab.lang.makeValidName(obj.name);
@@ -980,18 +844,12 @@ classdef TOFPlanet < handle
                 oNMoI = NaN;
             end
             try
-                oM_core = obs.M_core;
-            catch
-                oM_core = NaN;
-            end
-            try
                 oname = obs.name;
             catch
                 oname = [];
             end
-            OBS1 = [oM; oJ2; oJ4; oJ6; oJ8; oNMoI; oM_core];
+            OBS1 = [oM; oJ2; oJ4; oJ6; oJ8; oNMoI];
             OBS1 = double(OBS1);
-            if isempty(oM_core), OBS1 = [OBS1; NaN]; end
             T = [T table(OBS1)];
             if ~isempty(oname)
                 vname = matlab.lang.makeValidName(obs.name);
@@ -1015,9 +873,6 @@ classdef TOFPlanet < handle
             s.M      = obj.M;
             s.s0     = obj.s0;
             s.a0     = obj.a0;
-            s.rhoc   = obj.rhoc;
-            s.M_core = obj.M_core;
-            s.R_core = obj.R_core;
             s.M_Z    = obj.M_Z;
             s.rhobar = obj.rhobar;
             s.mrot   = obj.mrot;
@@ -1028,23 +883,23 @@ classdef TOFPlanet < handle
             s.J8     = obj.J8;
             s.NMoI   = obj.NMoI;
             s.si     = obj.si;
+            s.ai     = obj.ai;
             s.rhoi   = obj.rhoi;
             s.Pi     = obj.Pi;
             s.mi     = obj.mi;
             s.zi     = obj.zi;
             
-            if rdc == 1
+            if rdc > 0
                 s = structfun(@double, s, 'UniformOutput', false);
                 s.name = obj.name;
             end
-            if rdc == 2
+            if rdc > 1
                 s = structfun(@single, s, 'UniformOutput', false);
                 s.name = obj.name;
             end
-            if rdc == 3
-                s = structfun(@single, s, 'UniformOutput', false);
-                s.name = obj.name;
+            if rdc > 2
                 s.si     = [];
+                s.ai     = [];
                 s.rhoi   = [];
                 s.Pi     = [];
                 s.mi     = [];
@@ -1073,9 +928,10 @@ classdef TOFPlanet < handle
         end
         
         function T = to_table(obj)
-            % Create table of the grid quantities.
+            % Create table of critical quantities.
             
             T = table;
+            T.ai = double(obj.ai);
             T.si = double(obj.si);
             T.rhoi = double(obj.rhoi);
             T.Pi = double(obj.Pi);
@@ -1089,8 +945,10 @@ classdef TOFPlanet < handle
             % Export the state of the model as ascii file.
             
             % File name
-            if nargin == 1, fname = obj.name; end
-            if isempty(fname), fname = 'model1.txt'; end
+            if nargin < 2
+                fprintf('Usage:\n\ttof.to_ascii(filename)\n')
+                return
+            end
             validateattributes(fname, {'char'}, {'row'}, '', 'fname', 1)
             
             % Open file
@@ -1098,7 +956,7 @@ classdef TOFPlanet < handle
             cleanup = onCleanup(@()fclose(fid));
             
             % Write the header
-            fprintf(fid,'# Rotating fluid planet modeled 4th-order Theory of Figures.\n');
+            fprintf(fid,'# Rotating fluid planet modeled by 4th-order Theory of Figures.\n');
             fprintf(fid,'#\n');
             fprintf(fid,'# Model name: %s\n', obj.name);
             fprintf(fid,'#\n');
@@ -1109,8 +967,6 @@ classdef TOFPlanet < handle
             fprintf(fid,'# Equatorial radius a0 = %0.6e m\n', double(obj.a0));
             fprintf(fid,'# Rotation parameter m = %0.6f\n', double(obj.mrot));
             fprintf(fid,'# Rotation parameter q = %0.6f\n', double(obj.qrot));
-            fprintf(fid,'# Core mass fraction M_core/M = %g\n', ...
-                double(obj.M_core)/double(obj.M));
             fprintf(fid,'#\n');
             fprintf(fid,'# Calculated gravity zonal harmonics (x 10^6):\n');
             fprintf(fid,'# J2  = %12.6f\n', obj.J2*1e6);
@@ -1121,6 +977,7 @@ classdef TOFPlanet < handle
             fprintf(fid,'# Column data description (MKS):\n');
             fprintf(fid,'# i     - level surface index (increasing with depth)\n');
             fprintf(fid,'# s_i   - mean radius of level surface i\n');
+            fprintf(fid,'# a_i   - equatorial radius of level surface i\n');
             fprintf(fid,'# rho_i - density on level surfaces i\n');
             fprintf(fid,'# P_i   - pressure on level surface i\n');
             fprintf(fid,'# m_i   - mass below level surface i\n');
@@ -1129,13 +986,14 @@ classdef TOFPlanet < handle
             % Write the data
             fprintf(fid,'# Column data:\n');
             fprintf(fid,'# %-4s  ','i');
-            fprintf(fid,'%-10s  ','s_i');
+            fprintf(fid,'%-10s  ','s_i','a_i');
             fprintf(fid,'%-7s  ','rho_i');
             fprintf(fid,'%-10s  ','P_i','m_i');
             fprintf(fid,'\n');
             for k=1:obj.N
                 fprintf(fid,'  %-4d  ',k);
                 fprintf(fid,'%10.4e  ', double(obj.si(k)));
+                fprintf(fid,'%10.4e  ', double(obj.ai(k)));
                 fprintf(fid,'%7.1f  ', double(obj.rhoi(k)));
                 fprintf(fid,'%10.4e  ', double(obj.Pi(k)), double(obj.mi(k)));
                 fprintf(fid,'\n');
@@ -1347,24 +1205,6 @@ classdef TOFPlanet < handle
         function val = get.M_Z(obj)
             try
                 val = obj.mzi(1);
-            catch
-                val = [];
-            end
-        end
-        
-        function val = get.M_core(obj)
-            if isempty(obj.zeec), val = []; return, end
-            try
-                [~,val,~] = obj.locate_core('byz');
-            catch
-                val = [];
-            end
-        end
-        
-        function val = get.R_core(obj)
-            if isempty(obj.zeec), val = []; return, end
-            try
-                [val,~,~] = obj.locate_core('byz');
             catch
                 val = [];
             end
