@@ -267,6 +267,7 @@ classdef TOFPlanet < handle
         end
         
         function ab = renormalize(obj)
+            warning('OBSOLETE method, use fix_radius or normalize by hand')
             % Match input and calculated mass and equatorial radius.
             try
                 a = obj.radius/obj.a0;
@@ -318,6 +319,15 @@ classdef TOFPlanet < handle
             end
         end
         
+        function obj = fix_radius(obj)
+            % Resize planet to match equatorial radius to observed value.
+            
+            if isempty(obj.radius) || isempty(obj.a0) || isempty(obj.si)
+                warning('Missing information; no action.')
+                return
+            end
+            obj.si = obj.si*obj.radius/obj.a0;
+        end
     end % End of public methods block
     
     %% Visualizers
