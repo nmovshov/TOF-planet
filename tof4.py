@@ -294,6 +294,23 @@ def B1215(s, S, m):
     A = [A2, A4, A6, A8]
     return A
 
+def Upu(ss, SS, m):
+    # Following Nettelmann 2017 eqs. B3 and B.4, assuming equipotential.
+    s2 = ss[1]
+    s4 = ss[2]
+    S0 = SS[0]; S2 = SS[1]; S4 = SS[2]
+    S0p = SS[5]; S2p = SS[6]; S4p = SS[7]
+    A0 = np.zeros(s2.shape)
+    A0 = A0 + S0*(1 + 2/5*s2**2 - 4/105*s2**3 + 2/9*s4**2 + 43/175*s2**4 - 4/35*s2**2*s4)
+    A0 = A0 + S2*(-3/5*s2 + 12/35*s2**2 - 234/175*s2**3 + 24/35*s2*s4)
+    A0 = A0 + S4*(-5/9*s4 + 6/7*s2**2)
+    A0 = A0 + S0p*(1)
+    A0 = A0 + S2p*(2/5*s2 + 2/35*s2**2 + 4/35*s2*s4 - 2/25*s2**3)
+    A0 = A0 + S4p*(4/9*s4 + 12/35*s2**2)
+    A0 = A0 + m/3*(1 - 2/5*s2 - 9/35*s2**2 - 4/35*s2*s4 + 22/525*s2**3)
+
+    return -A0
+
 def _test():
     N = 2048
     zvec = np.linspace(1, 1.0/N, N)
