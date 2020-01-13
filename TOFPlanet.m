@@ -934,6 +934,8 @@ classdef TOFPlanet < handle
             
             if keepss
                 s.ss = obj.ss;
+            else
+                s.ss = [];
             end
         end
         
