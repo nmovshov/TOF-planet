@@ -39,7 +39,6 @@ classdef TOFPlanet < handle
         a0     % calculated equatorial radius
         rhobar % calculated mean density
         qrot   % rotation parameter referenced to a0
-        NMoI   % normalized moment of inertia
         Ui     % gravitational potential on grid
         Pi     % hydrostatic pressure on grid
         J2     % convenience alias to obj.Js(2)
@@ -298,6 +297,44 @@ classdef TOFPlanet < handle
                 obj.ss.s4(k)*Pn(4,mu) + obj.ss.s6(k)*Pn(6,mu) + ...
                 obj.ss.s8(k)*Pn(8,mu);
             r = obj.si(k)*(1 + shp);
+        end
+        
+        function s = verify_mean_radii(obj)
+            % Sanity check: return relative errors of calculated vs. assigned si.
+            %
+            % Volume-integrate each level surfaces to check that the mean radius
+            % comes out right. If the ToF is implemented correctly they should be
+            % very close.
+            
+            s = nan(obj.N,1);
+            for k=1:obj.N
+                rmax = @(teta)obj.level_surface(obj.si(k)/obj.si(1), teta);
+                fun = @(teta)(rmax(teta).^3).*sin(teta);
+                V = 2*pi/3*integral(fun, 0, pi);
+                s(k) = ((V/(4*pi/3))^(1/3) - obj.si(k))/obj.si(k);
+            end
+        end
+
+        function I = NMoI(obj)
+            % Return moment of inertia normalized by a0.
+            
+            deltas = [obj.rhoi(1); diff(obj.rhoi)];
+            num = 0;
+            den = 0;
+            [mus, gws] = gauleg(0, 1, 48); % Abscissas and weights for Gauss-quad
+            tetas = acos(mus);
+            for k=1:obj.N
+                if isempty(obj.ss)
+                    ximax = obj.si(k)/obj.a0*ones(size(tetas));
+                else
+                    ximax = obj.level_surface(obj.si(k)/obj.si(1),tetas)/obj.a0;
+                end
+                fun1 = deltas(k)*(ximax.^5);
+                fun2 = deltas(k)*(ximax.^3);
+                num = num + fun1*gws';
+                den = den + fun2*gws';
+            end
+            I = 2/5*num/den + 2/3*obj.J2;
         end
         
         function m = total_mass(obj,method)
@@ -1272,20 +1309,6 @@ classdef TOFPlanet < handle
                         obj.ss.s8(k)*Pn(8,0);
                     val(k) = obj.si(k)*(1 + shp);
                 end
-            end
-        end
-        
-        function val = get.NMoI(obj)
-            if isempty(obj.rhobar)
-                val = [];
-            else
-                rho = obj.rhoi;
-                s = obj.si;
-                for k=1:obj.N-1
-                    m = 4*pi/3*rho(k)*(s(k)^3 - s(k+1)^3);
-                    I(k) = 2/5*m*(s(k)^5 - s(k+1)^5)/(s(k)^3 - s(k+1)^3); %#ok<AGROW>
-                end
-                val = sum(I)/(obj.M*obj.s0^2);
             end
         end
         
