@@ -9,22 +9,36 @@ import numpy as np
 import warnings
 
 def tof4(zvec, dvec, mrot, tol=1e-6, maxiter=100, sskip=0):
-    """Return gravity coefficients of mass distribution in hydrostatic equilibrium.
+    """Return gravity coefficients of density profile in hydrostatic equilibrium.
 
     Parameters
     ----------
     zvec : ndarray, 1d, positive
-        Mean radii of level surfaces where density is specified.
+        Mean radii of level surfaces where density is defined
     dvec : ndarray, 1d, positive
-        Densities on level surfaces. The density should be monotonically
-        non-increasing with z, but this is not enforced.
+        Density on level surfaces; density should be monotonically
+        non-increasing with z (this is assumed, not enforced)
     mrot : float, scalar, nonnegative
-        Dimensionless rotation parameter.
+        Dimensionless rotation parameter, w^2*s^3/GM.
     sskip : integer, nonnegative
-        skip-n-spline step size
+        skip-n-spline step size; every sskip level surface shape will be
+        explicitly calculated, the rest will be splined
+
+    Outputs
+    -------
+    Js : 1-by-5 vector, real
+        Even harmonic gravity coefficients J0 to J8, J0 is included as a sanity
+        check and test of convergence
+    out : struct
+        A structure holding other quantities calculated in the course of running
+        tof, including the shape functions
+
+    Algorithm
+    ---------
+    As described in Nettelmann 2017 Appendix B.
     """
 
-    # Minimal input control (some day)
+    # Minimal input control
     zvec = np.array(zvec)
     dvec = np.array(dvec)
     assert zvec.shape == dvec.shape

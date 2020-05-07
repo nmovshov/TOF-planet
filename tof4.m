@@ -1,7 +1,47 @@
 function [Js, out] = tof4(zvec, dvec, mrot, tol, maxiter, ss_guesses, sskip)
 %TOF4 Forth-order Theory of Figures gravity coefficients.
-%   Js = TOF4(zvec, dvec, mrot)
-%   Js = TOF4(zvec, dvec, mrot, tol, maxiter, ss_guesses, sskip)
+%   Js = TOF4(zvec, dvec, mrot) returns 1-by-5 vector Js of gravity coefficients
+%   J0 through J8 of a rotating fluid planet in hydrostatic equilibrium. The
+%   density on level surfaces with mean radii zvec are given in dvec and the
+%   rotation parameter is assumed normalized to the outer level surface mean
+%   radius.
+%
+%   [Js, out] = TOF4(zvec, dvec, mrot, tol, maxiter, ss_guesses, sskip) accepts
+%   additional parametrs and returns additional output as described below.
+%
+%    Parameters
+%    ----------
+%    zvec : vector, positive
+%        Mean radii of level surfaces where density is defined
+%    dvec : vector, positive
+%        Density on level surfaces; density should be monotonically non-increasing
+%        with z (this is assumed, not enforced)
+%    mrot : scalar, nonnegative
+%        Dimensionless rotation parameter, w^2*s^3/GM.
+%    tol : scalar, positive (default 1e-6)
+%        Convergence tolerance for relative changes in Js (note limits of ToF)
+%    maxiter : scalar, integer (default 100)
+%        Safety feature
+%    ss_guesses : struct (default empty)
+%        Initial guess for shape functions. This is not all that helpful in
+%        speeding up convergence. It's occasionally helpful to preserve state
+%        between successive calls.
+%    sskip : integer, nonnegative
+%        skip-n-spline step size; every sskip level surface shape will be
+%        explicitly calculated, the rest will be splined
+%
+%    Outputs
+%    -------
+%    Js : 1-by-5 vector, real
+%        Even harmonic gravity coefficients J0 to J8 (J0 is included as a sanity
+%        check and test of convergence)
+%    out : struct
+%        A structure holding other quantities calculated in the course of running
+%        tof, including the shape functions
+%
+%   Algorithm
+%   ---------
+%   Theory of figures equations and coefficients given in Nettelmann 2017 Appendix B.
 
 %% Input parsing
 if nargin == 0 && nargout == 0
