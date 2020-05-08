@@ -315,26 +315,32 @@ classdef TOFPlanet < handle
             end
         end
 
-        function I = NMoI(obj)
+        function I = NMoI(obj, reduce)
             % Return moment of inertia normalized by a0.
             
+            if nargin < 2 || isempty(reduce), reduce = 'sum'; end
+            reduce = validatestring(reduce, {'sum', 'csum', 'none'});
+            
             deltas = [obj.rhoi(1); diff(obj.rhoi)];
-            num = 0;
+            num(obj.N) = 0;
             den = 0;
             [mus, gws] = gauleg(0, 1, 48); % Abscissas and weights for Gauss-quad
             tetas = acos(mus);
+            p2term = 1 - Pn(2, mus);
             for k=1:obj.N
                 if isempty(obj.ss)
                     ximax = obj.si(k)/obj.a0*ones(size(tetas));
                 else
                     ximax = obj.level_surface(obj.si(k)/obj.si(1),tetas)/obj.a0;
                 end
-                fun1 = deltas(k)*(ximax.^5);
+                fun1 = deltas(k)*(ximax.^5).*p2term;
                 fun2 = deltas(k)*(ximax.^3);
-                num = num + fun1*gws';
+                num(k) = fun1*gws';
                 den = den + fun2*gws';
             end
-            I = 2/5*num/den + 2/3*obj.J2;
+            if isequal(reduce, 'none'), I = (2/5)*(num/den); end
+            if isequal(reduce, 'sum'), I = (2/5)*sum(num)/den; end
+            if isequal(reduce, 'csum'), I = (2/5)*cumsum(num)/den; end
         end
         
         function m = total_mass(obj,method)
@@ -840,6 +846,51 @@ classdef TOFPlanet < handle
             legend(ah, 'off')
             gh = legend(ah, 'show','location','ne');
             gh.FontSize = 11;
+        end
+        
+        function [ah, lh] = plot_moi_contribution(obj, varargin)
+            % Plot relative contribution to MoI by depth.
+            
+            p = inputParser;
+            p.addParameter('axes',[],@(x)isscalar(x)&&isgraphics(x, 'axes'))
+            p.addParameter('cumulative',false,@(x)isscalar(x)&&islogical(x))
+            p.parse(varargin{:})
+            pr = p.Results;
+            
+            % Prepare the data
+            if pr.cumulative
+                y = obj.NMoI('csum');
+                y = y/y(end);
+            else
+                y = obj.NMoI('none');
+                y = y/max(abs(y));
+            end
+            
+            % Prepare the canvas
+            if isempty(pr.axes)
+                fh = figure;
+                set(fh, 'defaultTextInterpreter', 'latex')
+                set(fh, 'defaultLegendInterpreter', 'latex')
+                ah = axes;
+            else
+                ah = pr.axes;
+                axes(ah)
+            end
+            hold(ah, 'on')
+            
+            % Plot the lines
+            lh = plot(obj.si/obj.s0, y, 'LineWidth',2);
+            
+            % Style and annotate axes
+            if isempty(pr.axes)
+                ah.Box = 'on';
+                xlabel('Normalized level surface mean radius, $z_i=s_i/s_0$', 'fontsize', 12)
+                if pr.cumulative
+                    ylabel('$I(z>z_i)$ [normalized]', 'fontsize', 12)
+                else
+                    ylabel('$I(z_i)$ [normalized]', 'fontsize', 12)
+                end
+            end
         end
     end % End of visulaizers block
     
