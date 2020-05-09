@@ -854,15 +854,20 @@ classdef TOFPlanet < handle
             p = inputParser;
             p.addParameter('axes',[],@(x)isscalar(x)&&isgraphics(x, 'axes'))
             p.addParameter('cumulative',false,@(x)isscalar(x)&&islogical(x))
+            p.addParameter('noisecancel',false,@(x)isscalar(x)&&islogical(x))
             p.parse(varargin{:})
             pr = p.Results;
             
             % Prepare the data
+            x = obj.si/obj.s0;
             if pr.cumulative
                 y = obj.NMoI('csum');
                 y = y/y(end);
             else
                 y = obj.NMoI('none');
+                if pr.noisecancel
+                    y(x > 0.99) = nan;
+                end
                 y = y/max(abs(y));
             end
             
@@ -879,7 +884,7 @@ classdef TOFPlanet < handle
             hold(ah, 'on')
             
             % Plot the lines
-            lh = plot(obj.si/obj.s0, y, 'LineWidth',2);
+            lh = plot(x, y, 'LineWidth',2);
             
             % Style and annotate axes
             if isempty(pr.axes)
