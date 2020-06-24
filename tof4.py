@@ -100,7 +100,50 @@ def tof4(zvec, dvec, mrot, tol=1e-6, maxiter=100, sskip=0):
     out.qrot = mrot*a0**3
     out.ss = ss
     out.SS = SS
+    out.NMoI = NMoI(zvec, dvec, ss, out.a0)
     return (Js, out)
+
+def NMoI(zi, rhoi, ss, a0):
+    # Fast moment of inertia calculation (normalized by a0)
+    deltas = np.flipud(np.hstack((rhoi[-1], np.diff(np.flipud(rhoi)))))
+    num = 0
+    den = 0
+    mus = np.linspace(0, 1, 101)
+    h = mus[1]/2 # for trapz integral
+    p2term = 1 - 0.5*(3*mus**2 - 1)
+    for k in range(len(zi)):
+        if ss is None: # hack for spherically symmetric rho(z)
+            ximax = zi[k]*np.ones_like(mus)
+        else:
+            ximax = (zi[k]/a0)*level_surface(k, mus, ss)
+        fun1 = deltas[k]*(ximax**5)*p2term
+        fun2 = deltas[k]*(ximax**3)
+        num = num + h*(fun1[0] + 2*sum(fun1[1:-1]) + fun1[-1]) # trapezoid rule
+        den = den + h*(fun2[0] + 2*sum(fun2[1:-1]) + fun2[-1]) # trapezoid rule
+
+    return (2/5)*(num/den)
+
+def level_surface(k, mus, ss):
+    # Normalized r(cos(theta)) on kth-level surface
+    s0 = ss[0][k]; s2 = ss[1][k]; s4 = ss[2][k]; s6 = ss[3][k]; s8 = ss[4][k]
+    shp = s0*Pn(0,mus) + s2*Pn(2,mus) + s4*Pn(4,mus) + s6*Pn(6,mus) + s8*Pn(8,mus)
+    return 1 + shp
+
+def Pn(n, x):
+    # Fast implementation of ordinary Legendre polynomials of low even degree.
+    if n == 0:
+        y = np.ones_like(x)
+    elif n == 2:
+        y = 0.5*(3*x**2 - 1)
+    elif n == 4:
+        y = (1/8)*(35*x**4 - 30*x**2 + 3)
+    elif n == 6:
+        y = (1/16)*(231*x**6 - 315*x**4 + 105*x**2 - 5)
+    elif n == 8:
+        y = (1/128)*(6435*x**8 - 12012*x**6 + 6930*x**4 - 1260*x**2 + 35)
+    else:
+        raise(Exception("Unimplemented order"))
+    return y
 
 def mcumtrapz(X, Y):
     # Convert scipy.integrate.cumtrapz to MATLAB-style cumtrapz.
@@ -339,6 +382,7 @@ def _test():
     print("J6 = {}".format(Js[3]))
     print("J8 = {}".format(Js[4]))
     print("q = {}".format(out.qrot))
+    print("I = {}".format(out.NMoI))
     print("")
 
 if __name__ == '__main__':
