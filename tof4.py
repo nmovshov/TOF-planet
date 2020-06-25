@@ -8,7 +8,7 @@ import sys
 import numpy as np
 import warnings
 
-def tof4(zvec, dvec, mrot, tol=1e-6, maxiter=100, sskip=0):
+def tof4(zvec, dvec, mrot, tol=1e-6, maxiter=100, sskip=0, calc_moi=False):
     """Return gravity coefficients of density profile in hydrostatic equilibrium.
 
     Parameters
@@ -23,6 +23,9 @@ def tof4(zvec, dvec, mrot, tol=1e-6, maxiter=100, sskip=0):
     sskip : integer, nonnegative
         skip-n-spline step size; every sskip level surface shape will be
         explicitly calculated, the rest will be splined
+    calc_moi : bool, scalar
+        Flag to calculate and return the normalized moment of inertia in output
+        struct; since this takes an extra half second or so it's off by default.
 
     Outputs
     -------
@@ -100,7 +103,10 @@ def tof4(zvec, dvec, mrot, tol=1e-6, maxiter=100, sskip=0):
     out.qrot = mrot*a0**3
     out.ss = ss
     out.SS = SS
-    out.NMoI = NMoI(zvec, dvec, ss, out.a0)
+    if calc_moi:
+        out.NMoI = NMoI(zvec, dvec, ss, out.a0)
+    else:
+        out.NMoI = None
     return (Js, out)
 
 def NMoI(zi, rhoi, ss, a0):
