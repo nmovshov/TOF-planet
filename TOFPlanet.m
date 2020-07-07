@@ -216,12 +216,13 @@ classdef TOFPlanet < handle
             zvec = double(obj.si/obj.si(1));
             dvec = double(obj.rhoi/obj.rhobar);
             if isempty(obj.ss)
-                ss_guess = [];
+                ss_guess = struct();
             else
                 ss_guess = structfun(@flipud, obj.ss, 'UniformOutput', false);
             end
             [obj.Js, out] = tof4(zvec, dvec, obj.mrot,...
-                obj.opts.dJtol, obj.opts.MaxIterHE, ss_guess, obj.opts.splineskip);
+                'tol',obj.opts.dJtol, 'maxiter',obj.opts.MaxIterHE,...
+                'ss_guesses',ss_guess, 'xlevels',obj.opts.xlevels);
             ET = toc(t_rlx);
             dJ = out.dJs;
             obj.ss = structfun(@flipud, out.ss, 'UniformOutput', false);
@@ -266,7 +267,6 @@ classdef TOFPlanet < handle
         end
         
         function ab = renormalize(obj)
-            warning('OBSOLETE method, use fix_radius or normalize by hand')
             % Match input and calculated mass and equatorial radius.
             try
                 a = obj.radius/obj.a0;

@@ -14,7 +14,7 @@ function options = tofset(varargin)
 %drhotol - Convergence tolerance for density adjustment [ positive real {1e-6} ]
 %MaxIterBar - Number of iterations allowed for relaxation to barotrope [ positive integer {60} ]
 %MaxIterHE - Number of iterations allowed for relaxation to equilibrium shape [ positive integer {60} ]
-%splineskip - Solve figure functions on every nth level and spline the rest [ nonnegative integer {0} ]
+%xlevels - Solve figure functions on xlevels and spline the rest [ nonnegative integer {64} ]
 %verbosity - Level of runtime messages [0 {1} 2 3 4]
 %debug - Debug mode flag (use preals instead of doubles) [ true | {false} ]
 
@@ -35,7 +35,7 @@ p.addParameter('MaxIterHE',60,@isposintscalar)
 p.addParameter('verbosity',1,@isnonnegintscalar)
 p.addParameter('debug',false,@islogicalscalar)
 p.addParameter('masmeth','layerz');
-p.addParameter('splineskip',0,@isnonnegintscalar)
+p.addParameter('xlevels',64,@isnonnegintscalar)
 
 % Parse name-value pairs and return.
 p.parse(varargin{:})

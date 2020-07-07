@@ -30,7 +30,7 @@ M = 317.8*u.earth_mass;
 %R = 6.9917979e7*u.m;
 R = 71492*u.km;
 
-N = 1024;
+N = 2048;
 tof = TOFPlanet('debug',debug);
 tof.name = [int2str(N),'-point TOF'];
 tof.mass = M;

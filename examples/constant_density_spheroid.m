@@ -37,15 +37,12 @@ s3 = b_exact; % *mean* radius, s^3=b*a^2 (but a=1) we will use this later
 xi_exact = @(mu)1./sqrt((1 + (el^2).*(mu.^2)));
 
 %% Take a quick look for sanity check
-try % requires R2016a or later
-    theta = linspace(0,2*pi);
-    polax = polarplot(theta, xi_exact(cos(theta)));
-    polax.Parent.ThetaZeroLocation = 'top';
-    polax.Parent.ThetaDir = 'clockwise';
-    polax.Parent.ThetaAxisUnits = 'rad';
-    hold
-catch
-end
+theta = linspace(0,2*pi);
+polax = polarplot(theta, xi_exact(cos(theta)));
+polax.Parent.ThetaZeroLocation = 'top';
+polax.Parent.ThetaDir = 'clockwise';
+polax.Parent.ThetaAxisUnits = 'rad';
+hold
 
 %% Now set up a TOFPlanet to mimic constant density case
 N = 12; % can be any number though!
@@ -57,14 +54,11 @@ tof.opts.verbosity = 2;
 tof.relax_to_HE();
 
 %% Take a quick look for sanity check
-try % requires R2016a or later
-    theta = linspace(0,2*pi);
-    polax = polarplot(theta, tof.level_surface(1, theta)/tof.level_surface(1,pi/2));
-    polax.Parent.ThetaZeroLocation = 'top';
-    polax.Parent.ThetaDir = 'clockwise';
-    polax.Parent.ThetaAxisUnits = 'rad';
-catch
-end
+theta = linspace(0,2*pi);
+polax = polarplot(theta, tof.level_surface(1, theta)/tof.level_surface(1,pi/2));
+polax.Parent.ThetaZeroLocation = 'top';
+polax.Parent.ThetaDir = 'clockwise';
+polax.Parent.ThetaAxisUnits = 'rad';
 
 %% Compare numerical and analytic solutions
 % Compare the level surface radii

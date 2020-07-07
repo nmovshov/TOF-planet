@@ -1,65 +1,77 @@
-function [Js, out] = tof4(zvec, dvec, mrot, tol, maxiter, ss_guesses, sskip)
+function [Js, out] = tof4(zvec, dvec, mrot, varargin)
 %TOF4 Forth-order Theory of Figures gravity coefficients.
 %   Js = TOF4(zvec, dvec, mrot) returns 1-by-5 vector Js of gravity coefficients
 %   J0 through J8 of a rotating fluid planet in hydrostatic equilibrium. The
-%   density on level surfaces with mean radii zvec are given in dvec and the
-%   rotation parameter is assumed normalized to the outer level surface mean
-%   radius.
+%   mandatory inputs are a vector of mean radii zvec, vector of corresponding
+%   densities dvec, and the rotation parameter mrot, whish is assumed normalized
+%   to the outer level surface mean radius.
 %
-%   [Js, out] = TOF4(zvec, dvec, mrot, tol, maxiter, ss_guesses, sskip) accepts
-%   additional parametrs and returns additional output as described below.
+%   [Js, out] = TOF4(zvec, dvec, mrot, 'NAME1',VALUE1, 'NAME2',VALUE2,...) accepts
+%   additional parametrs as NAME/VALUE pairs , and also returns an output struct
+%   holding diagnostic values and additional derived quantities, including the
+%   shape functions defining the full hydrostatic equlibirium solution.
 %
-%    Parameters
-%    ----------
-%    zvec : vector, positive
-%        Mean radii of level surfaces where density is defined
-%    dvec : vector, positive
-%        Density on level surfaces; density should be monotonically non-increasing
-%        with z (this is assumed, not enforced)
-%    mrot : scalar, nonnegative
-%        Dimensionless rotation parameter, w^2*s^3/GM.
-%    tol : scalar, positive (default 1e-6)
-%        Convergence tolerance for relative changes in Js (note limits of ToF)
-%    maxiter : scalar, integer (default 100)
-%        Safety feature
-%    ss_guesses : struct (default empty)
-%        Initial guess for shape functions. This is not all that helpful in
-%        speeding up convergence. It's occasionally helpful to preserve state
-%        between successive calls.
-%    sskip : integer, nonnegative
-%        skip-n-spline step size; every sskip level surface shape will be
-%        explicitly calculated, the rest will be splined
+% Inputs, required
+% ----------------
+% zvec : 1d array, positive real
+%     Mean radii of level surfaces where density is defined, indexed from the
+%     outside in, i.e., zvec(1)=s0 is the radius of the outermost level surface.
+%     Units of zvec are unimportant as values will be normalized to outer radius.
+% dvec : 1d array, positive real
+%     Density on level surfaces. Units are unimportant as values will be
+%     normalized to the mean (bulk) density. The density should be monotonically
+%     non-increasing with zvec, but this is not enforced.
+% mrot : scalar, nonnegative
+%     Dimensionless rotation parameter. Recall m = w^2s0^3/GM.
 %
-%    Outputs
-%    -------
-%    Js : 1-by-5 vector, real
-%        Even harmonic gravity coefficients J0 to J8 (J0 is included as a sanity
-%        check and test of convergence)
-%    out : struct
-%        A structure holding other quantities calculated in the course of running
-%        tof, including the shape functions
+% Inputs, NAME/VALUE pairs
+% tol : scalar, positive, (tol=1e-6)
+%     Convergence tolerance for relative changes in Js in successive iterations
+%     (but keep in mind truncation error of ToF).
+% maxiter : scalar, positive, integer, (maxiter=100)
+%     Maximum number of algorithm iterations.
+% xlevels : scalar or vector, nonnegative, integer (xlevels=64)
+%     Levels whose shape will be explicitly calculated. The shape functions will
+%     be explicitly calculated for these levels, and spline-interpolated in
+%     between. This can result in significant speedup with minimal loss of
+%     precision, if the xlevels are chosen by trial and error to fit the required
+%     precision and the spacing of density levels. A scalar value is interpreted
+%     as a number of xlevels to be uniformaly distributed among the density
+%     levels. For example, a smooth-density 1024-level model can benefit from
+%     almost 16x-speedup by specifying xlevels=64 while retaining a 10^-6 relative
+%     precision on J2. A vector value is interpreted as indices of levels to be
+%     used as xlevels. (A negative value is a quick way to flag a full calculation
+%     instead of skip-n-spline, useful for debugging.)
+% ss_guesses : struct (default empty)
+%     Initial guess for shape functions. This is not all that helpful in speeding
+%     up convergence. It's occasionally helpful to preserve state between
+%     successive calls.
 %
-%   Algorithm
-%   ---------
-%   Theory of figures equations and coefficients given in Nettelmann 2017 Appendix B.
+% Outputs
+% -------
+% Js : 1-by-5 vector, real
+%     Even harmonic gravity coefficients J0 to J8 (J0 is included as a sanity
+%     check and test of convergence).
+% out : struct
+%     A structure holding other quantities calculated in the course of running
+%     tof, including the shape functions that define the full solution.
+%
+% Algorithm
+% ---------
+% Theory of figures equations and coefficients from Nettelmann 2017 Appendix B.
 
 %% Input parsing
-if nargin == 0 && nargout == 0
-    help('tof4.m')
+% Zero inputs case, usage only
+if nargin == 0
+    print_usage()
     return
 end
-narginchk(3,7);
-if nargin < 4 || isempty(tol), tol = 1e-6; end
-if nargin < 5 || isempty(maxiter), maxiter = 100; end
-if nargin < 6 || isempty(ss_guesses), ss_guesses = struct(); end
-if nargin < 7 || isempty(sskip), sskip = 0; end
+narginchk(3,inf);
+
+% Mandatory inputs
 validateattributes(zvec,{'numeric'},{'finite','nonnegative','vector'},'','zvec',1)
 validateattributes(dvec,{'numeric'},{'finite','nonnegative','vector'},'','dvec',2)
-validateattributes(mrot,{'numeric'},{'finite','nonnegative','scalar'},'','mrot',3)
-validateattributes(tol,{'numeric'},{'finite','positive','scalar'},'','tol',4)
-validateattributes(maxiter,{'numeric'},{'positive','scalar','integer'},'','maxiter',5)
-validateattributes(ss_guesses,{'struct'},{'scalar'},'','ss_guesses',6)
-validateattributes(sskip,{'numeric'},{'nonnegative','scalar','integer'},'','sskip',7)
+validateattributes(mrot,{'numeric'},{'finite','nonnegative','scalar'},'','qrot',3)
 assert(length(zvec) == length(dvec),...
     'length(zvec)=%d~=%d=length(dvec)',length(zvec),length(dvec))
 [zvec, I] = sort(zvec);
@@ -68,20 +80,25 @@ zvec = zvec(:); % now it's a column for sure
 dvec = dvec(:); % now it's a column for sure
 if zvec(1) == 0, zvec(1) = eps; end
 
-%% Normalize radii and density
+% Optional arguments
+opts = parsem(varargin{:});
+
+% Normalize radii and density
 dro = [dvec(end); diff(flipud(dvec))];
 m = sum(dro.*flipud(zvec).^3);
 robar = m/zvec(end)^3;
 zvec = zvec/zvec(end);
 dvec = dvec/robar;
 
-%% Initialize local variables
-if nargin < 6 || isempty(fieldnames(ss_guesses))
-    N = length(zvec);
+%% Define and initialize local variables
+nlay = length(zvec);
+
+if isempty(fieldnames(opts.ss_guesses))
+    N = nlay;
     ss.s0(N,1)=0; ss.s2(N,1)=0; ss.s4(N,1)=0; ss.s6(N,1)=0; ss.s8(N,1)=0;
 else
     try
-        ss = ss_guesses;
+        ss = opts.ss_guesses;
         fs = B1617(ss);
         SS = B9(zvec, dvec, fs);
     catch ME
@@ -89,9 +106,18 @@ else
     end
 end
 
+% Define down-sampled variabels (for skip-n-spline)
+if isscalar(opts.xlevels)
+    sskip = max(fix(nlay/opts.xlevels), 1);
+    xind = 1:sskip:nlay;
+else
+    warning('Experimental feature, use with care.')
+    xind = opts.xlevels;
+end
+
 %% The loop, following Nettelmann (2017) Appendix B
 Js = [0, 0, 0, 0, 0]; % J0=0 ensures at least one iteration
-for iter=1:maxiter
+for iter=1:opts.maxiter
     % Equations B.16-B.17
     fs = B1617(ss);
 
@@ -99,24 +125,20 @@ for iter=1:maxiter
     SS = B9(zvec, dvec, fs);
 
     % And finally, the system of simultaneous equations B.12-B.15.
-    if sskip == 0
-        ss = solve_B1215(ss, SS, mrot);
-    else
-        ss = skipnspline_B1215(ss, SS, mrot, zvec, sskip);
-    end
+    ss = skipnspline_B1215(ss, SS, mrot, zvec, xind);
 
     % The Js, by eqs. B.1 and B.11
     [new_Js, a0] = B111(ss, SS);
 
     % Check for convergence to terminate
     dJs = abs(Js - new_Js)./abs(Js+eps);
-    if all(dJs < tol)
+    if all(dJs < opts.tol)
         break
-    elseif iter < maxiter
+    elseif iter < opts.maxiter
         Js = new_Js;
     end
 end
-if iter == maxiter
+if iter == opts.maxiter
     warning('TOF4:maxiter','Figure functions may not be fully converged.')
 end
 
@@ -129,6 +151,35 @@ out.qrot = mrot*a0^3;
 out.ss = ss;
 out.SS = SS;
 
+end
+
+%% Helper functions
+function print_usage()
+fprintf('Usage:\n\ttof4(zvec,dvec,mrot,''name'',value)\n')
+fprintf('Name-Value pair arguments:\n')
+fprintf('tol - Convergence tolerance for gravity coefficients [ positive real {1e-6} ]\n')
+fprintf('maxiter - Number of iterations allowed for relaxation to equilibrium shape [ positive integer {100} ]\n')
+fprintf('xlevels - Solve shape functions on xlevels and spline the rest [ integer scalar or vector {64} ]\n')
+fprintf('ss_guesses - Initial guess for shape functions [ scalar struct {[]} ]\n')
+end
+
+function options = parsem(varargin)
+p = inputParser;
+p.FunctionName = 'tof4.m';
+
+p.addParameter('tol',1e-6,@(x)isscalar(x)&&isreal(x)&&x>0)
+p.addParameter('maxiter',100,@(x)isscalar(x)&&isreal(x)&&x>0&&mod(x,1)==0)
+p.addParameter('xlevels',64,@(x)validateattributes(x,{'numeric'},{'vector','integer'}))
+p.addParameter('ss_guesses',struct(),@(x)isscalar(x)&&isstruct(x))
+
+% undocumented or obsolete options
+p.addParameter('nangles',48,@(x)isscalar(x)&&(x>0)&&(mod(x,1)==0)) % colatitudes defining level surface
+p.addParameter('kmax',30,@(x)isscalar(x)&&(x>6)&&(mod(x,2)==0)) % degree to cut mulitpole expansion
+p.addParameter('TolX',1e-12,@(x)isscalar(x)&&(x>0)) % termination tolerance for root finding
+
+% Parse name-value pairs and return
+p.parse(varargin{:})
+options = p.Results;
 end
 
 function fs = B1617(ss)
@@ -221,18 +272,19 @@ I8p = I8p(N) - I8p;
 SS.S8p = -D.*fs.f8p + Z.^-(2-8).*(D(N)*fs.f8p(N) - I8p);
 end
 
-function ss = solve_B1215(ss0, SS, mrot)
+function ss = skipnspline_B1215(ss0, SS, mrot, zvec, xind)
 % Solve the system B.12-B.15 for unknowns s2,s4,s6,s8.
 
 opts = optimset();
 opts.TolX = 1e-10;
 opts.TolFun = 1e-10;
 opts.Display = 'off';
-Y = nan(length(SS.S0), 5);
-Zs = [SS.S0, SS.S2, SS.S4, SS.S6, SS.S8];       % temp variable for parfor slicing
-Zps = [SS.S0p, SS.S2p, SS.S4p, SS.S6p, SS.S8p]; % temp variable for parfor slicing
-zs = [ss0.s2, ss0.s4, ss0.s6, ss0.s8];          % temp variable for parfor slicing
-parfor k=1:length(SS.S0)
+Y = nan(length(xind), 5);
+% (temp variables for parfor slicing)
+Zs = [SS.S0(xind), SS.S2(xind), SS.S4(xind), SS.S6(xind), SS.S8(xind)];
+Zps = [SS.S0p(xind), SS.S2p(xind), SS.S4p(xind), SS.S6p(xind), SS.S8p(xind)];
+zs = [ss0.s2(xind), ss0.s4(xind), ss0.s6(xind), ss0.s8(xind)];
+parfor k=1:length(xind)
     S = Zs(k,:);
     Sp = Zps(k,:);
     s0 = zs(k,:);
@@ -241,37 +293,11 @@ parfor k=1:length(SS.S0)
     XX(1) = -1/5*XX(2)^2 - 2/105*XX(2)^3 - 1/9*XX(3)^2 - 2/35*XX(2)^2*XX(3);
     Y(k,:) = XX;
 end
-ss.s0 = Y(:,1); ss.s2 = Y(:,2); ss.s4 = Y(:,3); ss.s6 = Y(:,4); ss.s8 = Y(:,5);
-end
-
-function ss = skipnspline_B1215(ss0, SS, mrot, zvec, sskip)
-% Solve the system B.12-B.15 for unknowns s2,s4,s6,s8.
-
-opts = optimset();
-opts.TolX = 1e-10;
-opts.TolFun = 1e-10;
-opts.Display = 'off';
-N = length(SS.S0);
-ind = 1:sskip:N;
-Y = nan(length(ind), 5);
- % (temp variables for parfor slicing)
-Zs = [SS.S0(ind), SS.S2(ind), SS.S4(ind), SS.S6(ind), SS.S8(ind)];
-Zps = [SS.S0p(ind), SS.S2p(ind), SS.S4p(ind), SS.S6p(ind), SS.S8p(ind)];
-zs = [ss0.s2(ind), ss0.s4(ind), ss0.s6(ind), ss0.s8(ind)];
-parfor k=1:length(ind)
-    S = Zs(k,:);
-    Sp = Zps(k,:);
-    s0 = zs(k,:);
-    fun = @(x)B1215(x, S, Sp, mrot);
-    XX = [0, fsolve(fun, s0, opts)];
-    XX(1) = -1/5*XX(2)^2 - 2/105*XX(2)^3 - 1/9*XX(3)^2 - 2/35*XX(2)^2*XX(3);
-    Y(k,:) = XX;
-end
-ss.s0 = spline(zvec(ind), Y(:,1), zvec);
-ss.s2 = spline(zvec(ind), Y(:,2), zvec);
-ss.s4 = spline(zvec(ind), Y(:,3), zvec);
-ss.s6 = spline(zvec(ind), Y(:,4), zvec);
-ss.s8 = spline(zvec(ind), Y(:,5), zvec);
+ss.s0 = spline(zvec(xind), Y(:,1), zvec);
+ss.s2 = spline(zvec(xind), Y(:,2), zvec);
+ss.s4 = spline(zvec(xind), Y(:,3), zvec);
+ss.s6 = spline(zvec(xind), Y(:,4), zvec);
+ss.s8 = spline(zvec(xind), Y(:,5), zvec);
 end
 
 function A = B1215(s, S, Sp, m)
