@@ -1,26 +1,28 @@
 function [Js, out] = tof4(zvec, dvec, mrot, varargin)
 %TOF4 Forth-order Theory of Figures gravity coefficients.
-%   Js = TOF4(zvec, dvec, mrot) returns 1-by-5 vector Js of gravity coefficients
-%   J0 through J8 of a rotating fluid planet in hydrostatic equilibrium. The
-%   mandatory inputs are a vector of mean radii zvec, vector of corresponding
-%   densities dvec, and the rotation parameter mrot, whish is assumed normalized
-%   to the outer level surface mean radius.
+%   Js = TOF4(zvec, dvec, mrot) returns 1-by-5 vector Js of gravity
+%   coefficients J0 through J8 of a rotating fluid planet in hydrostatic
+%   equilibrium. The mandatory inputs are a vector of mean radii zvec, vector
+%   of corresponding densities dvec, and the rotation parameter mrot, whish is
+%   assumed normalized to the outer level surface mean radius.
 %
-%   [Js, out] = TOF4(zvec, dvec, mrot, 'NAME1',VALUE1, 'NAME2',VALUE2,...) accepts
-%   additional parametrs as NAME/VALUE pairs , and also returns an output struct
-%   holding diagnostic values and additional derived quantities, including the
-%   shape functions defining the full hydrostatic equlibirium solution.
+%   [Js, out] = TOF4(zvec, dvec, mrot, 'NAME1',VALUE1, 'NAME2',VALUE2,...)
+%   accepts additional parametrs as NAME/VALUE pairs , and also returns an
+%   output struct holding diagnostic values and additional derived quantities,
+%   including the shape functions defining the full hydrostatic equlibirium
+%   solution.
 %
 % Inputs, required
 % ----------------
 % zvec : 1d array, positive real
 %     Mean radii of level surfaces where density is defined, indexed from the
-%     outside in, i.e., zvec(1)=s0 is the radius of the outermost level surface.
-%     Units of zvec are unimportant as values will be normalized to outer radius.
+%     outside in, i.e., zvec(1)=s0 is the radius of the outermost level
+%     surface. Units of zvec are unimportant as values will be normalized to
+%     outer radius.
 % dvec : 1d array, positive real
 %     Density on level surfaces. Units are unimportant as values will be
-%     normalized to the mean (bulk) density. The density should be monotonically
-%     non-increasing with zvec, but this is not enforced.
+%     normalized to the mean (bulk) density. The density should be
+%     monotonically non-increasing with zvec, but this is not enforced.
 % mrot : scalar, nonnegative
 %     Dimensionless rotation parameter. Recall m = w^2s0^3/GM.
 %
@@ -31,21 +33,20 @@ function [Js, out] = tof4(zvec, dvec, mrot, varargin)
 % maxiter : scalar, positive, integer, (maxiter=100)
 %     Maximum number of algorithm iterations.
 % xlevels : scalar or vector, nonnegative, integer (xlevels=64)
-%     Levels whose shape will be explicitly calculated. The shape functions will
-%     be explicitly calculated for these levels, and spline-interpolated in
-%     between. This can result in significant speedup with minimal loss of
-%     precision, if the xlevels are chosen by trial and error to fit the required
-%     precision and the spacing of density levels. A scalar value is interpreted
-%     as a number of xlevels to be uniformaly distributed among the density
-%     levels. For example, a smooth-density 1024-level model can benefit from
-%     almost 16x-speedup by specifying xlevels=64 while retaining a 10^-6 relative
-%     precision on J2. A vector value is interpreted as indices of levels to be
-%     used as xlevels. (A negative value is a quick way to flag a full calculation
-%     instead of skip-n-spline, useful for debugging.)
+%     Levels whose shape will be explicitly calculated. The shape functions
+%     will be explicitly calculated for these levels, and spline-interpolated
+%     in between. This can result in significant speedup with minimal loss of
+%     precision, if the xlevels are chosen by trial and error to fit the
+%     required precision and the spacing of density levels. A scalar value is
+%     interpreted as a number of xlevels to be uniformaly distributed among the
+%     density levels. For example, a smooth-density 1024-level model can
+%     benefit from almost 16x-speedup by specifying xlevels=64 while retaining
+%     a 10^-6 relative precision on J2. A vector value is interpreted as
+%     indices of levels to be used as xlevels.
 % ss_guesses : struct (default empty)
-%     Initial guess for shape functions. This is not all that helpful in speeding
-%     up convergence. It's occasionally helpful to preserve state between
-%     successive calls.
+%     Initial guess for shape functions. This is not all that helpful in
+%     speeding up convergence. It's occasionally helpful to preserve state
+%     between successive calls.
 %
 % Outputs
 % -------
