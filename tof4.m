@@ -3,8 +3,8 @@ function [Js, out] = tof4(zvec, dvec, mrot, varargin)
 %   Js = TOF4(zvec, dvec, mrot) returns 1-by-5 vector Js of gravity
 %   coefficients J0 through J8 of a rotating fluid planet in hydrostatic
 %   equilibrium. The mandatory inputs are a vector of mean radii zvec, vector
-%   of corresponding densities dvec, and the rotation parameter mrot, whish is
-%   assumed normalized to the outer level surface mean radius.
+%   of corresponding densities dvec, and the rotation parameter mrot, assumed
+%   normalized to the outer level surface mean radius.
 %
 %   [Js, out] = TOF4(zvec, dvec, mrot, 'NAME1',VALUE1, 'NAME2',VALUE2,...)
 %   accepts additional parametrs as NAME/VALUE pairs , and also returns an
