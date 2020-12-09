@@ -288,7 +288,7 @@ classdef TOFPlanet < handle
             %
             % Usage:r = tof(el, theta)
             
-            validateattributes(el,{'numeric'},{'positive','scalar','<=',1},'','l',1)
+            validateattributes(el,{'numeric'},{'nonnegative','scalar','<=',1},'','l',1)
             validateattributes(theta,{'numeric'},{'vector','>=',0,'<=',2*pi},'','theta',2)
             
             k = find(obj.si/obj.si(1) <= el, 1, 'first');
