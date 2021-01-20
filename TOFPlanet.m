@@ -321,7 +321,14 @@ classdef TOFPlanet < handle
             if nargin < 2 || isempty(reduce), reduce = 'sum'; end
             reduce = validatestring(reduce, {'sum', 'csum', 'none'});
             
-            deltas = [obj.rhoi(1); diff(obj.rhoi)];
+            if strcmp(obj.opts.moimeth, 'layerz')
+                deltas = [obj.rhoi(1); diff(obj.rhoi)];
+            elseif strcmp(obj.opts.moimeth, 'midlayerz')
+                romid = [(obj.rhoi(1:end-1) + obj.rhoi(2:end))/2; obj.rhoi(end)];
+                deltas = [romid(1); diff(romid)];
+            else
+                error('Unknown moimeth %s',obj.opts.moimeth)
+            end
             num(obj.N) = 0;
             den = 0;
             [mus, gws] = gauleg(0, 1, 48); % Abscissas and weights for Gauss-quad

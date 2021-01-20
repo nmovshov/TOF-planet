@@ -111,6 +111,7 @@ def tof4(zvec, dvec, mrot, tol=1e-6, maxiter=100, sskip=0, calc_moi=False):
 
 def NMoI(zi, rhoi, ss, a0):
     # Fast moment of inertia calculation (normalized by a0)
+    rhoi = np.hstack((rhoi[0], (rhoi[:-1] + rhoi[1:])/2))
     deltas = np.flipud(np.hstack((rhoi[-1], np.diff(np.flipud(rhoi)))))
     num = 0
     den = 0

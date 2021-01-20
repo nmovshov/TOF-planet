@@ -34,7 +34,8 @@ p.addParameter('MaxIterBar',60,@isposintscalar)
 p.addParameter('MaxIterHE',60,@isposintscalar)
 p.addParameter('verbosity',1,@isnonnegintscalar)
 p.addParameter('debug',false,@islogicalscalar)
-p.addParameter('masmeth','layerz');
+p.addParameter('masmeth','trapz'); % undocumented mass integral method
+p.addParameter('moimeth','midlayerz'); % undocumented moi integral method
 p.addParameter('xlevels',128,@isnonnegintscalar)
 
 % Parse name-value pairs and return.
