@@ -96,7 +96,7 @@ classdef TOFPlanet < handle
                 validateattributes(x.s8,{'numeric'},{'column','numel',obj.N},'','s8')
                 obj.ss = ss_guesses;
             catch ME
-                warning('ss_guesses not set because:\n%s',ME.message)
+                warning(ME.identifier,'ss_guesses not set because:\n%s',ME.message)
             end
         end
         
