@@ -170,7 +170,7 @@ p.FunctionName = 'tof4.m';
 
 p.addParameter('tol',1e-6,@(x)isscalar(x)&&isreal(x)&&x>0)
 p.addParameter('maxiter',100,@(x)isscalar(x)&&isreal(x)&&x>0&&mod(x,1)==0)
-p.addParameter('xlevels',64,@(x)validateattributes(x,{'numeric'},{'vector','integer'}))
+p.addParameter('xlevels',-1,@(x)validateattributes(x,{'numeric'},{'vector','integer'}))
 p.addParameter('ss_guesses',struct(),@(x)isscalar(x)&&isstruct(x))
 
 % undocumented or obsolete options
@@ -223,20 +223,6 @@ function SS = B9(Z, D, fs)
 
 N = length(Z); % x(N) is faster than x(end)
 
-% m = nan(N,1);
-% fun = @(z)interp1(Z, D.*Z.^2, z, 'pchip');
-% for k=1:N
-%     m(k) = integral(fun,0,Z(k));
-% end
-% m = 4*pi*m;
-%
-% m(1) = 4*pi/3*D(1)*Z(1)^3;
-% for k=2:N
-%     m(k) = m(k-1) + 4*pi/3*D(k)*(Z(k)^3 - Z(k-1)^3);
-% end
-%
-% SS.S0 = m./(m(N)*Z.^3);
-
 I0 = cumtrapz(D, Z.^(0+3).*fs.f0);
 SS.S0 = D.*fs.f0 - Z.^-(0+3).*I0;
 
@@ -274,92 +260,93 @@ SS.S8p = -D.*fs.f8p + Z.^-(2-8).*(D(N)*fs.f8p(N) - I8p);
 end
 
 function ss = skipnspline_B1215(ss0, SS, mrot, zvec, xind)
-% Solve the system B.12-B.15 for unknowns s2,s4,s6,s8.
+% Update the system B.12-B.15 for new s2,s4,s6,s8.
 
-opts = optimset();
-opts.TolX = 1e-10;
-opts.TolFun = 1e-10;
-opts.Display = 'off';
-Y = nan(length(xind), 5);
-% (temp variables for parfor slicing)
+% Skip
 Zs = [SS.S0(xind), SS.S2(xind), SS.S4(xind), SS.S6(xind), SS.S8(xind)];
 Zps = [SS.S0p(xind), SS.S2p(xind), SS.S4p(xind), SS.S6p(xind), SS.S8p(xind)];
 zs = [ss0.s2(xind), ss0.s4(xind), ss0.s6(xind), ss0.s8(xind)];
-parfor k=1:length(xind)
-    S = Zs(k,:);
-    Sp = Zps(k,:);
-    s0 = zs(k,:);
-    fun = @(x)B1215(x, S, Sp, mrot);
-    XX = [0, fsolve(fun, s0, opts)];
-    XX(1) = -1/5*XX(2)^2 - 2/105*XX(2)^3 - 1/9*XX(3)^2 - 2/35*XX(2)^2*XX(3);
-    Y(k,:) = XX;
+
+newzs = B1215(zs, Zs, Zps, mrot);
+newz0 = (-1/5)*newzs(:,1).^2 - (2/105)*newzs(:,1).^3 - ...
+        (1/9)*newzs(:,2).^2 - 2/35*newzs(:,1).^2.*newzs(:,2);
+Y = [newz0, newzs];
+
+% And spline
+if length(xind) < length(zvec)
+    ss.s0 = spline(zvec(xind), Y(:,1), zvec);
+    ss.s2 = spline(zvec(xind), Y(:,2), zvec);
+    ss.s4 = spline(zvec(xind), Y(:,3), zvec);
+    ss.s6 = spline(zvec(xind), Y(:,4), zvec);
+    ss.s8 = spline(zvec(xind), Y(:,5), zvec);
+else
+    ss.s0 = Y(:,1);
+    ss.s2 = Y(:,2);
+    ss.s4 = Y(:,3);
+    ss.s6 = Y(:,4);
+    ss.s8 = Y(:,5);
 end
-ss.s0 = spline(zvec(xind), Y(:,1), zvec);
-ss.s2 = spline(zvec(xind), Y(:,2), zvec);
-ss.s4 = spline(zvec(xind), Y(:,3), zvec);
-ss.s6 = spline(zvec(xind), Y(:,4), zvec);
-ss.s8 = spline(zvec(xind), Y(:,5), zvec);
 end
 
-function A = B1215(s, S, Sp, m)
-% Compute the RHS of B.12-B.15.
+function new_s = B1215(s, S, Sp, m)
+% Compute the RHS of B.12-B.15 and "solve" for sn.
 
-s2 = s(1); s4 = s(2); s6 = s(3); s8 = s(4);
-S0 = S(1); S2 = S(2); S4 = S(3); S6 = S(4); S8 = S(5);
-S0p = Sp(1); S2p = Sp(2); S4p = Sp(3); S6p = Sp(4); S8p = Sp(5); %#ok<NASGU>
+s2 = s(:,1); s4 = s(:,2); s6 = s(:,3); s8 = s(:,4);
+S0 = S(:,1); S2 = S(:,2); S4 = S(:,3); S6 = S(:,4); S8 = S(:,5);
+S0p = Sp(:,1); S2p = Sp(:,2); S4p = Sp(:,3); S6p = Sp(:,4); S8p = Sp(:,5);
 
-% B.12
+% B.12 (not including -s2S0)
 A2 = 0;
-A2 = A2 + S0*(-1*s2 + 2/7*s2^2 + 4/7*s2*s4 - 29/35*s2^3 + 100/693*s4^2 + ...
-               454/1155*s2^4 - 36/77*s2^2*s4);
-A2 = A2 + S2*(1 - 6/7*s2 - 6/7*s4 + 111/35*s2^2 - 1242/385*s2^3 + 144/77*s2*s4);
-A2 = A2 + S4*(-10/7*s2 - 500/693*s4 + 180/77*s2^2);
-A2 = A2 + S2p*(1 + 4/7*s2 + 1/35*s2^2 + 4/7*s4 - 16/105*s2^3 + 24/77*s2*s4);
-A2 = A2 + S4p*(8/7*s2 + 72/77*s2^2 + 400/693*s4);
-A2 = A2 + m/3*(-1 + 10/7*s2 + 9/35*s2^2 - 4/7*s4 + 20/77*s2*s4 - 26/105*s2^3);
+A2 = A2 + S0.*(2/7*s2.^2 + 4/7*s2.*s4 - 29/35*s2.^3 + 100/693*s4.^2 + ...
+               454/1155*s2.^4 - 36/77*s2.^2.*s4);
+A2 = A2 + S2.*(1 - 6/7*s2 - 6/7*s4 + 111/35*s2.^2 - 1242/385*s2.^3 + 144/77*s2.*s4);
+A2 = A2 + S4.*(-10/7*s2 - 500/693*s4 + 180/77*s2.^2);
+A2 = A2 + S2p.*(1 + 4/7*s2 + 1/35*s2.^2 + 4/7*s4 - 16/105*s2.^3 + 24/77*s2.*s4);
+A2 = A2 + S4p.*(8/7*s2 + 72/77*s2.^2 + 400/693*s4);
+A2 = A2 + m/3*(-1 + 10/7*s2 + 9/35*s2.^2 - 4/7*s4 + 20/77*s2.*s4 - 26/105*s2.^3);
 
-% B.13
+% B.13 (not including -s4S0)
 A4 = 0;
-A4 = A4 + S0*(-1*s4 + 18/35*s2^2 - 108/385*s2^3 + 40/77*s2*s4 + ...
-              90/143*s2*s6 + 162/1001*s4^2 + 16902/25025*s2^4 - ...
-              7369/5005*s2^2*s4);
-A4 = A4 + S2*(-54/35*s2 - 60/77*s4 + 648/385*s2^2 - 135/143*s6 + ...
-              21468/5005*s2*s4 - 122688/25025*s2^3);
-A4 = A4 + S4*(1 - 100/77*s2 - 810/1001*s4 + 6368/1001*s2^2);
-A4 = A4 + S6*(-315/143*s2);
-A4 = A4 + S2p*(36/35*s2 + 108/385*s2^2 + 40/77*s4 + 3578/5005*s2*s4 - ...
-               36/175*s2^3 + 90/143*s6);
-A4 = A4 + S4p*(1 + 80/77*s2 + 1346/1001*s2^2 + 648/1001*s4);
-A4 = A4 + S6p*(270/143*s2);
-A4 = A4 + m/3*(-36/35*s2 + 114/77*s4 + 18/77*s2^2 - 978/5005*s2*s4 + ...
-               36/175*s2^3 - 90/143*s6);
+A4 = A4 + S0.*(18/35*s2.^2 - 108/385*s2.^3 + 40/77*s2.*s4 + ...
+              90/143*s2.*s6 + 162/1001*s4.^2 + 16902/25025*s2.^4 - ...
+              7369/5005*s2.^2.*s4);
+A4 = A4 + S2.*(-54/35*s2 - 60/77*s4 + 648/385*s2.^2 - 135/143*s6 + ...
+              21468/5005*s2.*s4 - 122688/25025*s2.^3);
+A4 = A4 + S4.*(1 - 100/77*s2 - 810/1001*s4 + 6368/1001*s2.^2);
+A4 = A4 + S6.*(-315/143*s2);
+A4 = A4 + S2p.*(36/35*s2 + 108/385*s2.^2 + 40/77*s4 + 3578/5005*s2.*s4 - ...
+               36/175*s2.^3 + 90/143*s6);
+A4 = A4 + S4p.*(1 + 80/77*s2 + 1346/1001*s2.^2 + 648/1001*s4);
+A4 = A4 + S6p.*(270/143*s2);
+A4 = A4 + m/3*(-36/35*s2 + 114/77*s4 + 18/77*s2.^2 - 978/5005*s2.*s4 + ...
+               36/175*s2.^3 - 90/143*s6);
 
-% B.14
+% B.14 (not including -s6S0)
 A6 = 0;
-A6 = A6 + S0*(-s6 + 10/11*s2*s4 - 18/77*s2^3 + 28/55*s2*s6 + 72/385*s2^4 + ...
-              20/99*s4^2 - 54/77*s2^2*s4);
-A6 = A6 + S2*(-15/11*s4 + 108/77*s2^2 - 42/55*s6 - 144/77*s2^3 + 216/77*s2*s4);
-A6 = A6 + S4*(-25/11*s2 - 100/99*s4 + 270/77*s2^2);
-A6 = A6 + S6*(1 - 98/55*s2);
-A6 = A6 + S2p*(10/11*s4 + 18/77*s2^2 + 36/77*s2*s4 + 28/55*s6);
-A6 = A6 + S4p*(20/11*s2 + 108/77*s2^2 + 80/99*s4);
-A6 = A6 + S6p*(1 + 84/55*s2);
-A6 = A6 + m/3*(-10/11*s4 - 18/77*s2^2 + 34/77*s2*s4 + 82/55*s6);
+A6 = A6 + S0.*(10/11*s2.*s4 - 18/77*s2.^3 + 28/55*s2.*s6 + 72/385*s2.^4 + ...
+              20/99*s4.^2 - 54/77*s2.^2.*s4);
+A6 = A6 + S2.*(-15/11*s4 + 108/77*s2.^2 - 42/55*s6 - 144/77*s2.^3 + 216/77*s2.*s4);
+A6 = A6 + S4.*(-25/11*s2 - 100/99*s4 + 270/77*s2.^2);
+A6 = A6 + S6.*(1 - 98/55*s2);
+A6 = A6 + S2p.*(10/11*s4 + 18/77*s2.^2 + 36/77*s2.*s4 + 28/55*s6);
+A6 = A6 + S4p.*(20/11*s2 + 108/77*s2.^2 + 80/99*s4);
+A6 = A6 + S6p.*(1 + 84/55*s2);
+A6 = A6 + m/3*(-10/11*s4 - 18/77*s2.^2 + 34/77*s2.*s4 + 82/55*s6);
 
-% B.15
+% B.15 (not including -s8S0)
 A8 = 0;
-A8 = A8 + S0*(-1*s8 + 56/65*s2*s6 + 72/715*s2^4 + 490/1287*s4^2 - 84/143*s2^2*s4);
-A8 = A8 + S2*(-84/65*s6 - 144/143*s2^3 + 336/143*s2*s4);
-A8 = A8 + S4*(-2450/1287*s4 + 420/143*s2^2);
-A8 = A8 + S6*(-196/65*s2);
+A8 = A8 + S0.*(56/65*s2.*s6 + 72/715*s2.^4 + 490/1287*s4.^2 - 84/143*s2.^2.*s4);
+A8 = A8 + S2.*(-84/65*s6 - 144/143*s2.^3 + 336/143*s2.*s4);
+A8 = A8 + S4.*(-2450/1287*s4 + 420/143*s2.^2);
+A8 = A8 + S6.*(-196/65*s2);
 A8 = A8 + S8*(1);
-A8 = A8 + S2p*(56/65*s6 + 56/143*s2*s4);
-A8 = A8 + S4p*(1960/1287*s4 + 168/143*s2^2);
-A8 = A8 + S6p*(168/65*s2);
+A8 = A8 + S2p.*(56/65*s6 + 56/143*s2.*s4);
+A8 = A8 + S4p.*(1960/1287*s4 + 168/143*s2.^2);
+A8 = A8 + S6p.*(168/65*s2);
 A8 = A8 + S8p*(1);
-A8 = A8 + m/3*(-56/65*s6 - 56/143*s2*s4);
+A8 = A8 + m/3*(-56/65*s6 - 56/143*s2.*s4);
 
-A = [A2, A4, A6, A8];
+new_s = [A2./S0, A4./S0, A6./S0, A8./S0];
 end
 
 function [Js, aos] = B111(ss, SS)

@@ -12,7 +12,7 @@ clc
 close all
 
 %% Set up a TOF object and give it a density profile linear in mean radii
-N = 2048;
+N = 4096;
 tof = TOFPlanet();
 tof.si = linspace(1, 1/N, N)';
 dl = 1/(N-1);
