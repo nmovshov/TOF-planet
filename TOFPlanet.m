@@ -21,9 +21,10 @@ classdef TOFPlanet < handle
     end
     properties (SetAccess = private)
         N      % convenience name for length(obj.si)
-        ss     % shape functions (returned by tof4.m)
-        SS     % shape functions (returned by tof4.m)
-        Js     % external gravity coefficients (returned by tof4.m)
+        ss     % shape functions (returned by tof<n>.m)
+        SS     % shape functions (returned by tof<n>.m)
+        A0     % dimensionless potential (returned by tof<n>.m)
+        Js     % external gravity coefficients (returned by tof<n>.m)
         betam  % mass renormalization factor (obj.mass/obj.M)
         alfar  % radius renormalization factor (obj.radius/obj.a0)
     end
@@ -45,9 +46,12 @@ classdef TOFPlanet < handle
         J4     % convenience alias to obj.Js(3)
         J6     % convenience alias to obj.Js(4)
         J8     % convenience alias to obj.Js(5)
+        J10    % convenience aloas to obj.Js(6) if exists
+        J12    % convenience aloas to obj.Js(7) if exists
+        J14    % convenience aloas to obj.Js(8) if exists
     end
     properties (GetAccess = private)
-        aos    % calculated equatorial to mean radius ratio (from tof4.m)
+        aos    % calculated equatorial to mean radius ratio (from tof<n>.m)
         G      % Gravitational constant
         u      % let's hold a units struct for convenience
     end
@@ -148,6 +152,7 @@ classdef TOFPlanet < handle
             mihe = obj.opts.MaxIterHE;
             obj.opts.MaxIterHE = 2;
             warning('off','TOF4:maxiter')
+            warning('off','TOF7:maxiter')
             t_rlx = tic;
             
             % Main loop
@@ -160,7 +165,9 @@ classdef TOFPlanet < handle
                 end
                 
                 old_Js = obj.Js;
-                if isempty(old_Js), old_Js = [-1,0,0,0,0]; end
+                if isempty(old_Js)
+                    old_Js = [-1, zeros(1,obj.opts.toforder)];
+                end
                 old_ro = obj.rhoi;
                 obj.relax_to_HE();
                 obj.update_densities;
@@ -197,6 +204,7 @@ classdef TOFPlanet < handle
             % Some clean up
             obj.opts.MaxIterHE = mihe;
             warning('on','TOF4:maxiter')
+            warning('on','TOF7:maxiter')
             
             % Optional communication
             if (verb > 0)
@@ -206,7 +214,7 @@ classdef TOFPlanet < handle
         end
         
         function [ET, dJ] = relax_to_HE(obj)
-            % Call tof4 to obtain equilibrium shape and gravity.
+            % Call tof<n> to obtain equilibrium shape and gravity.
             
             if (obj.opts.verbosity > 1)
                 fprintf('  Relaxing to hydrostatic equilibrium...\n')
@@ -220,7 +228,12 @@ classdef TOFPlanet < handle
             else
                 ss_guess = structfun(@flipud, obj.ss, 'UniformOutput', false);
             end
-            [obj.Js, out] = tof4(zvec, dvec, obj.mrot,...
+            if obj.opts.toforder == 4
+                tofun = @tof4;
+            else
+                tofun = @tof7;
+            end
+            [obj.Js, out] = tofun(zvec, dvec, obj.mrot,...
                 'tol',obj.opts.dJtol, 'maxiter',obj.opts.MaxIterHE,...
                 'ss_guesses',ss_guess, 'xlevels',obj.opts.xlevels);
             ET = toc(t_rlx);
@@ -228,6 +241,7 @@ classdef TOFPlanet < handle
             obj.ss = structfun(@flipud, out.ss, 'UniformOutput', false);
             obj.SS = structfun(@flipud, out.SS, 'UniformOutput', false);
             obj.aos = out.a0;
+            obj.A0 = flipud(out.A0);
             
             if (obj.opts.verbosity > 1)
                 fprintf('  Relaxing to hydrostatic equilibrium...done.\n')
@@ -467,7 +481,7 @@ classdef TOFPlanet < handle
                 lh(1).Color = [0.31, 0.31, 0.31];
             end
             if isempty(obj.name)
-                lh(1).DisplayName = 'TOF4 model';
+                lh(1).DisplayName = 'TOF model';
             else
                 lh(1).DisplayName = obj.name;
             end
@@ -1120,13 +1134,6 @@ classdef TOFPlanet < handle
     
     %% Private (or obsolete) methods
     methods (Access = private)
-        function y = P_ref(obj)
-            U = obj.G*obj.mass/obj.s0^3*obj.si.^2.*obj.Upu();
-            rho = 0.5*(obj.rhoi(1:end-1) + obj.rhoi(2:end));
-            y = zeros(obj.N, 1)*rho(1)*U(1);
-            y(1) = obj.P0;
-            y(2:end) = y(1) + cumsum(-rho.*diff(U));
-        end
         function y = P_mid(obj)
             % Pressure interpolated to halfway between level surfaces.
             
@@ -1135,22 +1142,6 @@ classdef TOFPlanet < handle
             x = double(obj.si);
             xq = [(x(1:end-1) + x(2:end))/2; x(end)/2];
             y = interp1(x, v, xq, 'pchip')*obj.u.Pa;
-        end
-        function y = Upu(obj)
-            % Following Nettelmann 2017 eqs. B3 and B.4, assuming equipotential.
-            s2 = obj.ss.s2;
-            s4 = obj.ss.s4;
-            A0(obj.N,1) = 0;
-            A0 = A0 + obj.SS.S0.*(1 + 2/5*s2.^2 - 4/105*s2.^3 + 2/9*s4.^2 + ...
-                43/175*s2.^4 - 4/35*s2.^2.*s4);
-            A0 = A0 + obj.SS.S2.*(-3/5*s2 + 12/35*s2.^2 - 234/175*s2.^3 + 24/35*s2.*s4);
-            A0 = A0 + obj.SS.S4.*(-5/9*s4 + 6/7*s2.^2);
-            A0 = A0 + obj.SS.S0p.*(1);
-            A0 = A0 + obj.SS.S2p.*(2/5*s2 + 2/35*s2.^2 + 4/35*s2.*s4 - 2/25*s2.^3);
-            A0 = A0 + obj.SS.S4p.*(4/9*s4 + 12/35*s2.^2);
-            A0 = A0 + obj.mrot/3*(1 - 2/5*s2 - 9/35*s2.^2 - 4/35*s2.*s4 + 22/525*s2.^3);
-            
-            y = -A0;
         end
     end % End of private methods block
     
@@ -1181,22 +1172,9 @@ classdef TOFPlanet < handle
         
         function val = get.Ui(obj)
             % Following Nettelmann 2017 eqs. B3 and B.4, assuming equipotential.
-            if isempty(obj.ss), val = []; return, end
-            if isempty(obj.SS), val = []; return, end
+            if isempty(obj.A0), val = []; return, end
             
-            s2 = obj.ss.s2;
-            s4 = obj.ss.s4;
-            A0(obj.N,1) = 0;
-            A0 = A0 + obj.SS.S0.*(1 + 2/5*s2.^2 - 4/105*s2.^3 + 2/9*s4.^2 + ...
-                                  43/175*s2.^4 - 4/35*s2.^2.*s4);
-            A0 = A0 + obj.SS.S2.*(-3/5*s2 + 12/35*s2.^2 - 234/175*s2.^3 + 24/35*s2.*s4);
-            A0 = A0 + obj.SS.S4.*(-5/9*s4 + 6/7*s2.^2);
-            A0 = A0 + obj.SS.S0p.*(1);
-            A0 = A0 + obj.SS.S2p.*(2/5*s2 + 2/35*s2.^2 + 4/35*s2.*s4 - 2/25*s2.^3);
-            A0 = A0 + obj.SS.S4p.*(4/9*s4 + 12/35*s2.^2);
-            A0 = A0 + obj.mrot/3*(1 - 2/5*s2 - 9/35*s2.^2 - 4/35*s2.*s4 + 22/525*s2.^3);
-            
-            val = -obj.G*obj.mass/obj.s0^3*obj.si.^2.*A0;
+            val = -obj.G*obj.mass/obj.s0^3*obj.si.^2.*obj.A0; %TODO: decide on mass versus M
         end
                 
         function val = get.Pi(obj)
@@ -1204,11 +1182,20 @@ classdef TOFPlanet < handle
                 val = [];
                 return
             end
+            n = obj.N;
             U = obj.Ui;
-            rho = 0.5*(obj.rhoi(1:end-1) + obj.rhoi(2:end));
-            val = zeros(obj.N, 1)*rho(1)*U(1);
+            rho = obj.rhoi;
+            r = obj.si;
+            gradU = zeros(n,1)*U(1)/r(1); % for units in dbg mode
+            val = zeros(n,1)*rho(1)*U(1); % for units in dbg mode
+            gradU(1) = (U(1) - U(2))/(r(1) - r(2));
+            gradU(2:n-1) = (U(1:n-2) - U(3:n))./(r(1:n-2) - r(3:n));
+            gradU(n) = (U(n-1) - U(n))/(r(n-1) - r(n));
+            intgrnd = rho.*gradU;
             val(1) = obj.P0;
-            val(2:end) = val(1) + cumsum(-rho.*diff(U));
+            for k=1:n-1
+                val(k+1) = val(k) + 0.5*(r(k) - r(k+1))*(intgrnd(k) + intgrnd(k+1));
+            end
         end
         
         function val = get.Ki(obj)
@@ -1283,7 +1270,7 @@ classdef TOFPlanet < handle
                 val(obj.N) = 4*pi/3*rho(obj.N)*s(obj.N)^3;
                 for k=obj.N-1:-1:1
                     val(k) = val(k+1) + 4*pi/3*rho(k)*(s(k)^3 - s(k+1)^3);
-                end
+                end % TODO: switch to cumtrapz
                 val = val';
             end
         end

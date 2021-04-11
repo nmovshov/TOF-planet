@@ -32,7 +32,7 @@ function [Js, out] = tof4(zvec, dvec, mrot, varargin)
 %     (but keep in mind truncation error of ToF).
 % maxiter : scalar, positive, integer, (maxiter=100)
 %     Maximum number of algorithm iterations.
-% xlevels : scalar or vector, nonnegative, integer (xlevels=64)
+% xlevels : scalar or vector, nonnegative, integer (xlevels=-1)
 %     Levels whose shape will be explicitly calculated. The shape functions
 %     will be explicitly calculated for these levels, and spline-interpolated
 %     in between. This can result in significant speedup with minimal loss of
@@ -42,7 +42,9 @@ function [Js, out] = tof4(zvec, dvec, mrot, varargin)
 %     density levels. For example, a smooth-density 1024-level model can
 %     benefit from almost 16x-speedup by specifying xlevels=64 while retaining
 %     a 10^-6 relative precision on J2. A vector value is interpreted as
-%     indices of levels to be used as xlevels.
+%     indices of levels to be used as xlevels. Skip-n-spline is recommended for
+%     very high resolution density profiles, N>~10^4. Disable skip-n-spline by
+%     passing xlevels=-1 rather than xlevels=N, to avoid the spline ovearhead.
 % ss_guesses : struct (default empty)
 %     Initial guess for shape functions. This is not all that helpful in
 %     speeding up convergence. It's occasionally helpful to preserve state
@@ -151,6 +153,7 @@ out.a0 = a0;
 out.qrot = mrot*a0^3;
 out.ss = ss;
 out.SS = SS;
+out.A0 = B4(ss,SS,mrot);
 
 end
 
@@ -185,6 +188,7 @@ end
 
 function fs = B1617(ss)
 % Nettelmann 2017 eqs. B.16 and B.17.
+
 s0 = ss.s0; s2 = ss.s2; s4 = ss.s4; s6 = ss.s6; s8 = ss.s8; %#ok<NASGU>
 
 fs.f0 = ones(size(ss.s0));
@@ -220,6 +224,8 @@ end
 
 function SS = B9(Z, D, fs)
 % Nettelmann 2017 eq. B.9.
+
+% TODO: replace cumtrapz call with cumtrapz one-liner
 
 N = length(Z); % x(N) is faster than x(end)
 
@@ -257,6 +263,24 @@ SS.S6p = -D.*fs.f6p + Z.^-(2-6).*(D(N)*fs.f6p(N) - I6p);
 I8p = cumtrapz(D, Z.^(2-8).*fs.f8p);
 I8p = I8p(N) - I8p;
 SS.S8p = -D.*fs.f8p + Z.^-(2-8).*(D(N)*fs.f8p(N) - I8p);
+
+end
+
+function A0 = B4(ss, SS, mrot)
+% Compute the RHS of B.4 in Nettelmann (2017).
+
+s2 = ss.s2; s4 = ss.s4;
+S0 = SS.S0; S2 = SS.S2; S4 = SS.S4;
+S0p = SS.S0p; S2p = SS.S2p; S4p = SS.S4p;
+
+A0 = zeros(size(s2));
+A0 = A0 + S0.*(1 + (2/5)*s2.^2 - (4/105)*s2.^3 + (2/9)*s4.^2 + (43/175)*s2.^4 - (4/35)*s2.^2.*s4);
+A0 = A0 + S2.*(-(3/5)*s2 + (12/35)*s2.^2 - (234/175)*s2.^3 + (24/35)*s2.*s4);
+A0 = A0 + S4.*((6/7)*s2.^2 - (5/9)*s4);
+A0 = A0 + S0p.*(1);
+A0 = A0 + S2p.*((2/5)*s2 + (2/35)*s2.^2 + (4/35)*s2.*s4 - (2/25)*s2.^3);
+A0 = A0 + S4p.*((4/9)*s4 + (12/35)*s2.^2);
+A0 = A0 + (mrot/3)*(1 - (2/5)*s2 - (9/35)*s2.^2 - (4/35)*s2.*s4 + (22/525)*s2.^3);
 end
 
 function ss = skipnspline_B1215(ss0, SS, mrot, zvec, xind)
@@ -350,13 +374,17 @@ new_s = [A2./S0, A4./S0, A6./S0, A8./S0];
 end
 
 function [Js, aos] = B111(ss, SS)
+% Return Js from SS, with Req/Rm a necessary side effect.
+
 N = length(ss.s0);
 s0 = ss.s0(N); s2 = ss.s2(N); s4 = ss.s4(N); s6 = ss.s6(N); s8 = ss.s8(N);
 aos = 1 + s0 - (1/2)*s2 + (3/8)*s4 - (5/16)*s6 + (35/128)*s8;
+
 J0 = -(aos^-0)*SS.S0(N);
 J2 = -(aos^-2)*SS.S2(N);
 J4 = -(aos^-4)*SS.S4(N);
 J6 = -(aos^-6)*SS.S6(N);
 J8 = -(aos^-8)*SS.S8(N);
+
 Js = [J0, J2, J4, J6, J8];
 end

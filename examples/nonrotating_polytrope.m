@@ -52,7 +52,7 @@ for k=1:length(N)
     tof(k).si = R*linspace(1, 1/N(k), N(k))';
     tof(k).rhoi = ones(N(k),1)*M/(4*pi/3*R^3);
     tof(k).mrot = 0;
-    %tof(k).P0 = 0.0*u.bar;
+    tof(k).P0 = 0.0*u.bar;
 end
 
 %% Construct a polytrope of index 1 to represent the planet's eos

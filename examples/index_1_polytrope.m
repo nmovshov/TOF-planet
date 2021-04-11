@@ -1,99 +1,112 @@
 %% GRAVITY COEFFICIENTS OF ROTATING INDEX-1 POLYTROPE
-% Example and test of the TofPlanet class. We construct and converge a model of a
-% rotating fluid planet with the pressure-density law
+% Example and test of the TofPlanet class. We construct and converge a model of
+% a rotating fluid planet with the pressure-density law
 %
 % $$P = K\rho^2$$
 %
 % with a polytropic constant $K$. This script demonstrates how to set up a
-% TOFPlanet object with a specified barotrope and converge to a density structure
-% in hydrostatic equilibrium with the given barotrope. The default starting
-% density profile is that of a homogeneous sphere.
+% TOFPlanet object with a specified barotrope and converge to a density
+% structure in hydrostatic equilibrium with the given barotrope. The default
+% starting density profile is that of a homogeneous sphere.
 %
-% The comparison model is the 3rd-order Zharkov and Trubitsyn theory. I take the
-% numbers from Table 5 of Hubbard (2013).
+% The main output is a benchmarking table. The numbers to aim for are
+% apparently those of the CLC method (Wisdom, 1996, unpublished) which is lost
+% to time. I take the numbers from Wisdom and Hubbard (2016) Table 3. For
+% consistency I try to replicate the Wisdom and Hubbard model exactly,
+% including using their values for G and K (Guillot, double hearsay) and trying
+% to match their q as close as possible with m.
+%
+% Also comparing with CMS results from Wisdom and Hubbard (2016) Table 4, and
+% with some q powers I dug out of the ZT red book that I think are supposed to
+% match a 3rd-order ToF solution. Also adding some more numbers I got from
+% Nadine (Nettelmann 2021 private communication).
 
 %% Prepare workspace
 clear
 clc
 close all
-debug = false;
-if debug
-    u = setUnits;
-else
-    u = setFUnits;
-end
-G = u.gravity;
+u = setFUnits;
 
-%% Set up a TOF Planet with arbitrary mass and radius
-% I'm using numbers for Jupiter just for kicks, no effect on Js of course.
-M = 317.8*u.earth_mass;
-%R = 6.9917979e7*u.m;
-R = 71492*u.km;
-
-N = 4096;
-tof = TOFPlanet('debug',debug);
-tof.name = [int2str(N),'-point TOF'];
-tof.mass = M;
-tof.radius = R;
-tof.si = R*linspace(1, 1/N, N)'; % will be renormalized
-tof.rhoi = ones(N,1)*M/(4*pi/3*R^3); % will be renormalized
-tof.mrot = 0.083432862292087;
-tof.P0 = 0*u.bar; % added to surface pressure
-
-%% Construct a polytrope of index 1 to represent the planet's eos
+%% Construct a polytrope of index 1, aiming for exact replicaiton of WH16
+G = 6.6738480e-11; % Hubbard to Guillot personal communcation
+GM = 1.266865361e17; % WH16
+M = GM/G;
+Re = 71492*u.km; % (to match K use K=2*G/pi*R^2 instead)
+qrot = 0.089195487; % WH16
+aos = 1.022875431133185; % WH16 Table 3 Re/R
+K = 2.003565e5; % Hubbard to Guillot personal communication (no effect on Js)
 n = 1;
-K = 2*G/pi*R^2; % ...matches radius just for show, K has no effect on the Js
 eos = barotropes.Polytrope(K, n);
 eos.name = '$P\propto\rho^2$';
-tof.eos = eos;
 
-%% To (barely) speed up convergence start with an approximate density structure
-a = sqrt(2*pi*G/K);
-r = pi/a;
-rho_av = 3*M/(4*pi*r^3);
-rho_c = (pi^2/3)*rho_av;
-x = (tof.si(1:end-1) + tof.si(2:end))/2;
-x(end+1) = tof.si(end)/2;
-tof.rhoi = rho_c*sin(a*x)./(a*x);
+%% Set up TOFPlanet(s)
+N = 4096;
 
-%% Relax to desired barotrope
-tof.opts.drhotol = 1e-5;
-tof.opts.dJtol = 1e-6;
-tof.opts.MaxIterBar = 30;
-tof.relax_to_barotrope;
+tofour = TOFPlanet('toforder',4);
+tofour.name = [int2str(N),'-point TOF4'];
+tofour.mass = M;
+tofour.radius = Re;
+tofour.si = Re*linspace(1, 1/N, N)'; % will be renormalized
+tofour.rhoi = ones(N,1)*M/(4*pi/3*Re^3); % will be renormalized
+tofour.mrot = qrot/aos^3; % trying to match WH16 qrot
+tofour.P0 = 0*u.bar; % added to surface pressure
+tofour.eos = eos;
 
-%% Compare computed and analytic density structure
-q = tof.qrot;
-% Zharkov & Trubistyn (1978) eq. 34.12
-ZT3 = [q;...
-    (0.173273*q - 0.197027*q^2 + 0.15*q^3)*1e2;...
-    (-0.081092*q^2 + 0.15*q^3)*-1e4;...
-    (0.056329*q^3)*1e5;...
-    nan; nan; nan];
+tofsev = TOFPlanet('toforder',7);
+tofsev.name = [int2str(N),'-point TOF7'];
+tofsev.mass = M;
+tofsev.radius = Re;
+tofsev.si = Re*linspace(1, 1/N, N)'; % will be renormalized
+tofsev.rhoi = ones(N,1)*M/(4*pi/3*Re^3); % will be renormalized
+tofsev.mrot = qrot/aos^3; % trying to match WH16 qrot
+tofsev.P0 = 0*u.bar; % added to surface pressure
+tofsev.eos = eos;
+
+%% Relax to desired barotrope (fast for tof4, slow for tof7)
+tofour.opts.drhotol = 1e-6;
+tofour.opts.dJtol = 1e-10;
+tofour.opts.MaxIterBar = 60;
+tofour.relax_to_barotrope;
+
+tofsev.opts.drhotol = 1e-6;
+tofsev.opts.dJtol = 1e-10;
+tofsev.opts.MaxIterBar = 60;
+tofsev.relax_to_barotrope;
+
+%% Construct the benchmarking table
+% The variables to compare are [Re/R, J2, J4, ..., J14]
+% With TOFPlanet
+MTOF4 = [tofour.a0/tofour.s0, tofour.Js(2:end), nan, nan, nan];
+MTOF7 = [tofsev.a0/tofsev.s0, tofsev.Js(2:end)];
+% Wisdom and Hubbard (2016) Table 3
+CLC = [1.022875431133185, 1.398851089834637e-2, -5.318281001092471e-4,...
+                          3.011832290533577e-5, -2.132115710726158e-6,...
+                          1.740671195871128e-7, -1.568219505602588e-8,...
+                          1.518099230068580e-9];
+% Wisdom and Hubbard (2016) Table 4
+CMS512 = [nan,            1.398924011471443e-2, -5.318792055591143e-4,...
+                          3.012230402792236e-5, -2.132458660888379e-6,...
+                          1.740988882124251e-7, -1.568529225158399e-8,...
+                          1.518412099478797e-9];
 % Hubbard (2013) Table 5
-H13_256 = [q; 1.3991574; 5.3182810; 3.0118323; 2.1321157; 1.7406710; 1.5682179];
-H13_512 = [q; 1.3989253; 5.3187997; 3.0122356; 2.1324628; 1.7409925; 1.5685327];
+H13 =    [nan, 1.3989253e-2, -5.3187997e-4, 3.0122356e-5, -2.1324628e-6,...
+               1.7409925e-7, -1.5685327e-8, 1.5184156e-9];
 
-% TOFPlanet
-TOF = [q; tof.J2*1e2; -tof.J4*1e4; tof.J6*1e5; -tof.J8*1e6; nan; nan];
+% Zharkov & Trubistyn (1978) eq. 34.12
+q = tofour.qrot;
+ZT3 = [nan, (0.173273*q - 0.197027*q^2 + 0.15*q^3),...
+            (-0.081092*q^2 + 0.15*q^3),...
+            (0.056329*q^3), nan, nan, nan, nan];
 
-% Make it a table
-T = table(ZT3, H13_256, H13_512, TOF);
-T.Properties.RowNames = {'q','J2x10^2','-J4x10^4','J6x10^5','-J8x10^6',...
-    'J10x10^7','-J12x10^8'};
+cols = {'Re/R', 'J2', 'J4', 'J6', 'J8', 'J10', 'J12', 'J14'};
+rows = {'CLC', 'TOF4', 'TOF7', 'CMS_WH16', 'CMS_H13', 'ZT78'};
+A = [CLC; MTOF4; MTOF7; CMS512; H13; ZT3];
+E = (A(2:end,:) - A(1,:))./A(1,:);
+T_vals = array2table(A, 'VariableNames', cols, 'RowNames', rows);
+T_errs = array2table(E, 'VariableNames', cols, 'RowNames', rows(2:end));
 
-% Display
-format long
-format compact
-disp(T)
+%% Output
+format shorte
+display(T_vals)
+display(T_errs)
 format
-format compact
-J2_err = (tof.J2*1e2 - H13_512(2))/(tof.J2*1e2)
-J4_err = (-tof.J4*1e4 - H13_512(3))/(-tof.J4*1e4)
-J6_err = (1e5*tof.J6 - H13_512(4))/(tof.J6*1e5)
-format
-try
-    %tof.plot_equipotential_surfaces;
-    tof.plot_barotrope('showinput',true,'showscaledinput',true);
-catch
-end
