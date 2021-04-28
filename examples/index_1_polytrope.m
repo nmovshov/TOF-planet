@@ -33,6 +33,8 @@ GM = 1.266865361e17; % WH16
 M = GM/G;
 Re = 71492*u.km; % (to match K use K=2*G/pi*R^2 instead)
 qrot = 0.089195487; % WH16
+wrot = sqrt(qrot*GM/Re^3);
+Prot = 2*pi/wrot;
 aos = 1.022875431133185; % WH16 Table 3 Re/R
 K = 2.003565e5; % Hubbard to Guillot personal communication (no effect on Js)
 n = 1;
@@ -44,21 +46,23 @@ N = 4096;
 
 tofour = TOFPlanet('toforder',4);
 tofour.name = [int2str(N),'-point TOF4'];
+tofour.G = G; % undocumented TOFPlanet property
 tofour.mass = M;
 tofour.radius = Re;
+tofour.period = Prot; % trying to match WH16 qrot
 tofour.si = Re*linspace(1, 1/N, N)'; % will be renormalized
 tofour.rhoi = ones(N,1)*M/(4*pi/3*Re^3); % will be renormalized
-tofour.mrot = qrot/aos^3; % trying to match WH16 qrot
 tofour.P0 = 0*u.bar; % added to surface pressure
 tofour.eos = eos;
 
 tofsev = TOFPlanet('toforder',7);
 tofsev.name = [int2str(N),'-point TOF7'];
+tofsev.G = G; % undocumented TOFPlanet property
 tofsev.mass = M;
 tofsev.radius = Re;
+tofsev.period = Prot; % trying to match WH16 qrot
 tofsev.si = Re*linspace(1, 1/N, N)'; % will be renormalized
 tofsev.rhoi = ones(N,1)*M/(4*pi/3*Re^3); % will be renormalized
-tofsev.mrot = qrot/aos^3; % trying to match WH16 qrot
 tofsev.P0 = 0*u.bar; % added to surface pressure
 tofsev.eos = eos;
 
@@ -66,11 +70,13 @@ tofsev.eos = eos;
 tofour.opts.drhotol = 1e-6;
 tofour.opts.dJtol = 1e-10;
 tofour.opts.MaxIterBar = 60;
+tofour.opts.MaxIterHE = 60;
 tofour.relax_to_barotrope;
 
 tofsev.opts.drhotol = 1e-6;
 tofsev.opts.dJtol = 1e-10;
 tofsev.opts.MaxIterBar = 60;
+tofsev.opts.MaxIterHE = 60;
 tofsev.relax_to_barotrope;
 
 %% Construct the benchmarking table
@@ -107,6 +113,6 @@ T_errs = array2table(E, 'VariableNames', cols, 'RowNames', rows(2:end));
 
 %% Output
 format shorte
-display(T_vals)
-display(T_errs)
+%display(T_vals)
+display(T_errs(:,1:3))
 format

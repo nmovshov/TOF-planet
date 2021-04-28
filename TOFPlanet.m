@@ -2,18 +2,32 @@ classdef TOFPlanet < handle
     %TOFPLANET Interior model of rotating fluid planet.
     %   This class implements a model of a rotating fluid planet using Theory of
     %   Figures to calculate the hydrostatic equilibrium shape and resulting
-    %   gravity field. A TOFPlanet object is defined by a given mass, equatorial
-    %   radius, rotation parameter, and optionally a barotrope.
+    %   gravity field. A TOFPlanet object is defined by a densiy profile rho(s),
+    %   supplied by the user and stored in the column vectors obj.si and
+    %   obj.rhoi, indexed from the surface in. To complete the definition the
+    %   user must also specify a mass, equatorial radius, and rotation period.
+    %   With these a gravity field and equilibrium shape can be determined,
+    %   with a call to obj.relax_to_HE().
+    %
+    %   Alternatively the user may supply a barotrope object, stored in
+    %   obj.eos, and call obj.relax_to_barotrope() to iteratively find a
+    %   density profile consistent with the calculated equilibrium pressure. To
+    %   this end a boundary pressure must also be given, in obj.P0, and an
+    %   initial density profile guess is still required (can be a simple one).
+    %   Note that we can't simultaneously impose an exact mass/radius and
+    %   barotrope. By default the reference mass and radius will be honored, by
+    %   renormalizing the converged density profile, and this will modify the
+    %   effective barotrope (to override set obj.opts.renorm=false).
     
     %% Properties
     properties
         name   % model name
         mass   % reference mass
         radius % reference radius (equatorial!)
+        period % refernce rotation period
         P0     % reference pressure
         si     % vector of mean radii (top down, s0=si(1) is outer radius)
         rhoi   % vector of densities on si grid
-        mrot   % rotation parameter, w^2s0^3/GM
         eos    % barotrope(s) (tip: help barotropes for options)
         bgeos  % optional background barotrope
         fgeos  % optional foreground barotrope
@@ -29,26 +43,25 @@ classdef TOFPlanet < handle
         alfar  % radius renormalization factor (obj.radius/obj.a0)
     end
     properties (Dependent)
-        M      % calculated mass
+        M      % calculated mass (equal to mass *after* renorm)
+        a0     % calculated equatorial radius (equal to radius *after* renorm)
         mi     % cumulative mass below si
         ai     % equatorial radii on level surfaces
         zi     % mass fraction in heavy elements
         mzi    % cumulative heavy elements mass below si
         Ki     % empirical bulk modulus (rho*dP/drho)
         M_Z    % estimated total heavy elements mass
-        s0     % calculated mean radius (another name for obj.si(1))
-        a0     % calculated equatorial radius
+        s0     % surface mean radius (another name for obj.si(1))
         rhobar % calculated mean density
-        qrot   % rotation parameter referenced to a0
+        wrot   % rotation frequency, 2pi/period
+        qrot   % rotation parameter wrot^2a0^3/GM
+        mrot   % rotation parameter, wrot^2s0^3/GM
         Ui     % gravitational potential on grid
         Pi     % hydrostatic pressure on grid
         J2     % convenience alias to obj.Js(2)
         J4     % convenience alias to obj.Js(3)
         J6     % convenience alias to obj.Js(4)
         J8     % convenience alias to obj.Js(5)
-        J10    % convenience aloas to obj.Js(6) if exists
-        J12    % convenience aloas to obj.Js(7) if exists
-        J14    % convenience aloas to obj.Js(8) if exists
     end
     properties (GetAccess = private)
         aos    % calculated equatorial to mean radius ratio (from tof<n>.m)
@@ -108,7 +121,7 @@ classdef TOFPlanet < handle
             % Copy physical properties from an +observables struct.
             obj.mass = obs.M;
             obj.radius = obs.a0;
-            obj.mrot = obs.m;
+            obj.period = obs.P;
             obj.P0 = obs.P0;
             try
                 obj.bgeos = obs.bgeos;
@@ -149,10 +162,13 @@ classdef TOFPlanet < handle
             end
             
             % Ready, set,...
-            mihe = obj.opts.MaxIterHE;
-            obj.opts.MaxIterHE = 2;
             warning('off','TOF4:maxiter')
             warning('off','TOF7:maxiter')
+            if obj.opts.toforder == 4
+                tofun = @tof4;
+            else
+                tofun = @tof7;
+            end
             t_rlx = tic;
             
             % Main loop
@@ -169,13 +185,30 @@ classdef TOFPlanet < handle
                     old_Js = [-1, zeros(1,obj.opts.toforder)];
                 end
                 old_ro = obj.rhoi;
-                obj.relax_to_HE();
+                
+                % Call the tof algorithm
+                if isempty(obj.ss)
+                    ss_guesses = struct();
+                else
+                    ss_guesses = structfun(@flipud, obj.ss, 'UniformOutput', false);
+                end
+                [obj.Js, out] = tofun(obj.si, obj.rhoi, obj.mrot,...
+                    'tol',obj.opts.dJtol, 'maxiter',obj.opts.MaxIterHE,...
+                    'xlevels',obj.opts.xlevels, 'ss_guesses',ss_guesses);
+                obj.ss = structfun(@flipud, out.ss, 'UniformOutput', false);
+                obj.SS = structfun(@flipud, out.SS, 'UniformOutput', false);
+                obj.aos = out.a0;
+                obj.A0 = flipud(out.A0);
+
+                % Update density from barotrope and renormalize
                 obj.update_densities;
+                obj.renormalize;
+
+                % Calculate changes in shape/density
                 dJs = abs((obj.Js - old_Js)./old_Js);
                 dJs = max(double(dJs(isfinite(dJs))));
                 dro = obj.rhoi./old_ro;
                 dro = var(double(dro(isfinite(dro))));
-                
                 if (verb > 0)
                     fprintf('Baropass %d (of max %d)...done. (%g sec)\n',...
                         iter, obj.opts.MaxIterBar, toc(t_pass))
@@ -196,13 +229,13 @@ classdef TOFPlanet < handle
                 warning('TOFPLANET:maxiter','Pressure/density may not be fully converged.')
             end
             
-            % Record last renorm factors
+            % Renorm and record factors
+            % TODO: if we still need betam we must fix this
             renorms = obj.renormalize;
             obj.alfar = renorms(1);
             obj.betam = renorms(2);
             
             % Some clean up
-            obj.opts.MaxIterHE = mihe;
             warning('on','TOF4:maxiter')
             warning('on','TOF7:maxiter')
             
@@ -299,8 +332,6 @@ classdef TOFPlanet < handle
         
         function r = level_surface(obj, el, theta)
             % Return r_l(theta) by expansion of Legendre polynomials.
-            %
-            % Usage:r = tof(el, theta)
             
             validateattributes(el,{'numeric'},{'nonnegative','scalar','<=',1},'','l',1)
             validateattributes(theta,{'numeric'},{'vector','>=',0,'<=',2*pi},'','theta',2)
@@ -1341,8 +1372,24 @@ classdef TOFPlanet < handle
             end
         end
         
+        function val = get.wrot(obj)
+            val = 2*pi./obj.period;
+        end
+        
         function val = get.qrot(obj)
-            val = obj.mrot*obj.aos^3;
+            GM = obj.G*obj.mass;
+            val = obj.wrot^2.*obj.radius^3./GM;
+        end
+        
+        function val = get.mrot(obj)
+            GM = obj.G*obj.mass;
+            val = obj.wrot^2.*obj.s0^3./GM;
+        end
+        
+        function set.mrot(obj,val)
+            warning('TOFPLANET:deprecation',...
+                'Setting mrot is deprecated; set a reference period instead.')
+            obj.period = (2*pi)/sqrt(val*obj.G*obj.M/obj.s0^3);
         end
         
         function val = get.a0(obj)
@@ -1403,6 +1450,14 @@ classdef TOFPlanet < handle
     
     %% Static methods
     methods (Static)
+        function r = kth_surface(k,ss)
+            % Return @r(theta) for level surface k.
+            
+            shp = @(mu) ss.s0(k)*Pn(0,mu) + ss.s2(k)*Pn(2,mu) + ...
+                ss.s4(k)*Pn(4,mu) + ss.s6(k)*Pn(6,mu) + ...
+                ss.s8(k)*Pn(8,mu);
+            r = @(teta) 1 + shp(cos(teta));
+        end
     end % End of static methods block
 end % End of classdef
 

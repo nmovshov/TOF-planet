@@ -172,7 +172,7 @@ fprintf('Usage:\n\ttof7(zvec,dvec,mrot,''name'',value)\n')
 fprintf('Name-Value pair arguments:\n')
 fprintf('tol - Convergence tolerance for gravity coefficients [ positive real {1e-6} ]\n')
 fprintf('maxiter - Number of iterations allowed for relaxation to equilibrium shape [ positive integer {100} ]\n')
-fprintf('xlevels - Solve shape functions on xlevels and spline the rest [ integer scalar or vector {64} ]\n')
+fprintf('xlevels - Solve shape functions on xlevels and spline the rest [ integer scalar or vector {-1} ]\n')
 fprintf('ss_guesses - Initial guess for shape functions [ scalar struct {[]} ]\n')
 end
 

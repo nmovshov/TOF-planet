@@ -43,42 +43,31 @@ polax.Parent.ThetaDir = 'clockwise';
 polax.Parent.ThetaAxisUnits = 'rad';
 hold
 
-%% Now set up a TOFPlanet to mimic constant density case
-N = 12; % can be any number really
+%% Now tof4 and tof7 with the same rotation m and constant density
+N = 128; % can be any number really
+svec = linspace(1, 1/N, N);
+dvec = ones(N,1);
 
-tofour = TOFPlanet();
-tofour.si = linspace(1,1/N,N)';
-tofour.rhoi = ones(N,1);
-tofour.mrot = m;
-tofour.opts.toforder = 4;
-tofour.opts.verbosity = 2;
-tofour.relax_to_HE();
-
-tofsev = TOFPlanet();
-tofsev.si = linspace(1,1/N,N)';
-tofsev.rhoi = ones(N,1);
-tofsev.mrot = m;
-tofsev.opts.toforder = 7;
-tofsev.opts.verbosity = 2;
-tofsev.relax_to_HE();
+[Js4, out4] = tof4(svec, dvec, m);
+[Js7, out7] = tof7(svec, dvec, m);
 
 %% Take a quick look for sanity check
 theta = linspace(0,2*pi);
-polarplot(theta, tofour.level_surface(1, theta)/tofour.level_surface(1,pi/2),...
-    'DisplayName','ToF4');
-polarplot(theta, tofsev.level_surface(1, theta)/tofsev.level_surface(1,pi/2),...
-    'DisplayName','ToF7');
+ss4 = out4.ss;
+ss7 = out7.ss;
+xi_4 = TOFPlanet.kth_surface(N, ss4);
+xi_7 = TOFPlanet.kth_surface(N, ss7);
+polarplot(theta, xi_4(theta)/xi_4(pi/2),'DisplayName','ToF4');
+polarplot(theta, xi_7(theta)/xi_7(pi/2),'DisplayName','ToF7');
 legend
 
 %% Compare numerical and analytic solutions
 % Compare the level surface radii
 teta = 0:0.01:pi;
 mu = cos(teta);
-xi_tof4 = @(t)tofour.level_surface(1,t);
-dxi4 = xi_tof4(teta)/xi_tof4(pi/2) - xi_exact(mu);
+dxi4 = xi_4(teta)/xi_4(pi/2) - xi_exact(mu);
 xi_err4 = max(abs(dxi4));
-xi_tof7 = @(t)tofsev.level_surface(1,t);
-dxi7 = xi_tof7(teta)/xi_tof7(pi/2) - xi_exact(mu);
+dxi7 = xi_7(teta)/xi_7(pi/2) - xi_exact(mu);
 xi_err7 = max(abs(dxi7));
 figure
 semilogy(mu, abs(dxi4), 'DisplayName','ToF4');
@@ -98,12 +87,10 @@ fprintf('ToF7 shape error = %g\n', xi_err7);
 % Compare the J values
 n = 0:2:8;
 Js_exact = (-1).^(1 + n/2).*(3./((n + 1).*(n + 3))).*(el^2/(1 + el^2)).^(n/2);
-Js_4 = tofour.Js;
+Js_4 = Js4;
+Js_7 = Js7(1:5);
 dJs_4 = Js_4 - Js_exact;
-J_err_4 = max(abs(dJs_4));
-Js_7 = tofsev.Js(1:5);
 dJs_7 = Js_7 - Js_exact;
-J_err_7 = max(abs(dJs_7));
 subplot(2,1,1,ah);
 subplot(2,1,2);
 lh = stem(n, abs(dJs_4), 'DisplayName','ToF4');
@@ -121,5 +108,5 @@ ah.YLabel.String = '$dJ_n$';
 sform = '$dJ_n = J_n - \frac{3(-1)^{1+n/2}}{(n+1)(n+3)}\left(\frac{l^2}{1+l^2}\right)^{n/2}$';
 ah.Title.String = sform;
 legend
-fprintf('ToF4 max J error = %g\n',J_err_4);
-fprintf('ToF7 max J error = %g\n',J_err_7);
+fprintf('ToF4 J2 relative error = %g\n',abs(Js_4(2) - Js_exact(2))/Js_exact(2));
+fprintf('ToF7 J2 relative error = %g\n',abs(Js_7(2) - Js_exact(2))/Js_exact(2));
