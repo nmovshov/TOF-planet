@@ -53,7 +53,7 @@ for k=1:length(nx)
     tof.opts.MaxIterBar = 60;
     tof.opts.MaxIterHE = 60;
     rtime(k) = tof.relax_to_barotrope();
-    textprogressbar(k/length(N)*100)
+    textprogressbar(k/length(nx)*100)
 end
 textprogressbar(' done.')
 

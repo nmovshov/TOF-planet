@@ -131,7 +131,7 @@ end
 Js = [0, 0, 0, 0, 0, 0, 0, 0]; % J0=0 ensures at least one iteration
 for iter=1:opts.maxiter
     % Equations B.16-B.17
-    fs = B1617(ss, C7);
+    fs = skipnspline_B1617(ss, zvec, xind, C7);
 
     % Equation B.9
     SS = B9(zvec, dvec, fs);
@@ -464,6 +464,35 @@ I14p = cumtrapz(D, Z.^(2-14).*fs.f14p);
 I14p = I14p(N) - I14p;
 SS.S14p = -D.*fs.f14p + Z.^-(2-14).*(D(N)*fs.f14p(N) - I14p);
 
+end
+
+function fs = skipnspline_B1617(ss, zvec, xind, C7)
+% Update the ToF7 equivalent of B.16-B.17 for new f_2n.
+
+% Skip
+zs.s0 = ss.s0(xind); zs.s2 = ss.s2(xind); zs.s4 = ss.s4(xind); zs.s6 = ss.s6(xind);
+zs.s8 = ss.s8(xind); zs.s10 = ss.s10(xind); zs.s12 = ss.s12(xind); zs.s14 = ss.s14(xind);
+fs = B1617(zs, C7);
+
+% And spline
+if length(xind) < length(zvec)
+    fs.f0   = spline(zvec(xind), fs.f0, zvec);
+    fs.f2   = spline(zvec(xind), fs.f2, zvec);
+    fs.f4   = spline(zvec(xind), fs.f4, zvec);
+    fs.f6   = spline(zvec(xind), fs.f6, zvec);
+    fs.f8   = spline(zvec(xind), fs.f8, zvec);
+    fs.f10  = spline(zvec(xind), fs.f10, zvec);
+    fs.f12  = spline(zvec(xind), fs.f12, zvec);
+    fs.f14  = spline(zvec(xind), fs.f14, zvec);
+    fs.f0p  = spline(zvec(xind), fs.f0p, zvec);
+    fs.f2p  = spline(zvec(xind), fs.f2p, zvec);
+    fs.f4p  = spline(zvec(xind), fs.f4p, zvec);
+    fs.f6p  = spline(zvec(xind), fs.f6p, zvec);
+    fs.f8p  = spline(zvec(xind), fs.f8p, zvec);
+    fs.f10p = spline(zvec(xind), fs.f10p, zvec);
+    fs.f12p = spline(zvec(xind), fs.f12p, zvec);
+    fs.f14p = spline(zvec(xind), fs.f14p, zvec);
+end
 end
 
 function ss = skipnspline_B1215(ss0, SS, mrot, zvec, xind, C7)
