@@ -31,9 +31,9 @@ eos = barotropes.Polytrope(K, n);
 eos.name = '$P\propto\rho^2$';
 
 %% Set up TOFPlanet(s)
-N = logspace(2, 5, 10);
-N = 2.^ceil(log2(N));
-N = unique(N);
+N = 2.^(10:20);
+nx = 256;
+zstrat = @(n)zvecs.topheavy(n);
 
 for k=1:length(N)
     tofour = TOFPlanet('toforder',4);
@@ -42,7 +42,7 @@ for k=1:length(N)
     tofour.mass = M;
     tofour.radius = Re;
     tofour.period = Prot; % trying to match WH16 qrot
-    tofour.si = Re*linspace(1, 1/N(k), N(k))'; % will be renormalized
+    tofour.si = Re*zstrat(N(k)); % will be renormalized
     tofour.rhoi = ones(N(k),1)*M/(4*pi/3*Re^3); % will be renormalized
     tofour.P0 = 0*u.bar; % added to surface pressure
     tofour.eos = eos;
@@ -54,7 +54,7 @@ for k=1:length(N)
     tofsev.mass = M;
     tofsev.radius = Re;
     tofsev.period = Prot; % trying to match WH16 qrot
-    tofsev.si = Re*linspace(1, 1/N(k), N(k))'; % will be renormalized
+    tofsev.si = Re*zstrat(N(k)); % will be renormalized
     tofsev.rhoi = ones(N(k),1)*M/(4*pi/3*Re^3); % will be renormalized
     tofsev.P0 = 0*u.bar; % added to surface pressure
     tofsev.eos = eos;
@@ -63,30 +63,34 @@ end
 
 %% Relax to desired barotrope (fast for tof4, slow for tof7)
 textprogressbar('Running ToF4 models...') 
+t = tic;
 for k=1:length(N)
     tofour = FOURS(k);
+    tofour.opts.xlevels = nx;
     tofour.opts.verbosity = 0;
     tofour.opts.drhotol = 1e-6;
     tofour.opts.dJtol = 1e-10;
     tofour.opts.MaxIterBar = 60;
     tofour.opts.MaxIterHE = 60;
-    tofour.relax_to_barotrope;
+    rt4(k) = tofour.relax_to_barotrope;
     textprogressbar(k/length(N)*100)
 end
-textprogressbar(' done.')
+textprogressbar(sprintf(' done. (%s)',seconds2human(toc(t))))
 
 textprogressbar('Running ToF7 models...')
+t = tic;
 for k=1:length(N)
     tofsev = SEVENS(k);
+    tofsev.opts.xlevels = nx;
     tofsev.opts.verbosity = 0;
     tofsev.opts.drhotol = 1e-6;
     tofsev.opts.dJtol = 1e-10;
     tofsev.opts.MaxIterBar = 60;
     tofsev.opts.MaxIterHE = 60;
-    tofsev.relax_to_barotrope;
+    rt7(k) = tofsev.relax_to_barotrope;
     textprogressbar(k/length(N)*100)
 end
-textprogressbar(' done.')
+textprogressbar(sprintf(' done. (%s)',seconds2human(toc(t))))
 
 %% Construct the benchmarking table
 % The variables to compare are [Re/R, J2, J4, ..., J14]
@@ -115,6 +119,7 @@ T_errs = array2table(E, 'VariableNames', cols, 'RowNames', rows(2:end));
 
 %% Output
 format shorte
-display(T_errs(:,2:6))
+display(T_errs(:,2:3))
 format
+clear SEVENS FOURS tofour tofsev k n u
 save n1ofN.mat
