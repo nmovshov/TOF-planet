@@ -374,7 +374,7 @@ new_s = [A2./S0, A4./S0, A6./S0, A8./S0];
 end
 
 function [Js, aos] = B111(ss, SS)
-% Return Js from SS, with Req/Rm a necessary side effect.
+% Return Js from SS, with Req/Rm a necessary bonus.
 
 N = length(ss.s0);
 s0 = ss.s0(N); s2 = ss.s2(N); s4 = ss.s4(N); s6 = ss.s6(N); s8 = ss.s8(N);

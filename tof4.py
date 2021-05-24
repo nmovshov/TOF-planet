@@ -1,62 +1,68 @@
-#---------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 #  Fourth-order Theory of Figures gravity calculator
 #
 # Author: Naor Movshovitz (nmovshov at gee mail dot com)
-#---------------------------------------------------------------------------------
-from __future__ import division
+#------------------------------------------------------------------------------
 import sys
 import numpy as np
 import warnings
+from scipy.interpolate import interp1d
 
-def tof4(zvec, dvec, mrot, tol=1e-6, maxiter=100, sskip=0, calc_moi=False):
-    """Return gravity coefficients of density profile in hydrostatic equilibrium.
+def tof4(zvec, dvec, mrot, xlevels=-1, tol=1e-6, maxiter=100, calc_moi=False):
+    """Return gravity coefficients of self-gravitating rotating fluid.
 
     Parameters
     ----------
     zvec : ndarray, 1d, positive
-        Mean radii of level surfaces where density is defined
+        Mean radii of level surfaces where density is defined.
     dvec : ndarray, 1d, positive
         Density on level surfaces; density should be monotonically
-        non-increasing with z (this is assumed, not enforced)
+        non-increasing with z (this is *assumed*, not enforced).
     mrot : float, scalar, nonnegative
-        Dimensionless rotation parameter, w^2*s^3/GM.
-    sskip : integer, nonnegative
-        skip-n-spline step size; every sskip level surface shape will be
-        explicitly calculated, the rest will be splined
-    calc_moi : bool, scalar
+        Dimensionless rotation parameter, w^2*s0^3/GM.
+    xlevels : scalar or vector, nonnegative, integer (xlevels=-1)
+        Levels whose shape will be explicitly calculated. The shape functions
+        will be explicitly calculated for these levels, and spline-interpolated
+        in between. This can result in significant speedup with minimal loss of
+        precision. A scalar value is interpreted as a number of xlevels to be
+        uniformaly distributed among the density levels. A vector value is
+        interpreted as indices of levels to be used as xlevels. Skip-n-spline
+        is recommended for very high resolution density profiles, N>~10^4.
+        Disable skip-n-spline by passing xlevels=-1 rather than xlevels=N, to
+        avoid the spline ovearhead.
+    tol : scalar, positive, (tol=1e-6)
+        Convergence tolerance for relative changes in Js in successive
+        iterations (but keep in mind truncation error of ToF).
+    maxiter : scalar, positive, integer, (maxiter=100)
+        Maximum number of algorithm iterations.
+    calc_moi : bool, scalar (default False)
         Flag to calculate and return the normalized moment of inertia in output
-        struct; since this takes an extra half second or so it's off by default.
+        struct; off by default since it takes an extra half second or so.
 
     Outputs
     -------
     Js : 1-by-5 vector, real
-        Even harmonic gravity coefficients J0 to J8, J0 is included as a sanity
-        check and test of convergence
+        Even harmonic gravity coefficients J0 to J8 (J0 is included as a sanity
+        check and test of convergence).
     out : struct
-        A structure holding other quantities calculated in the course of running
-        tof, including the shape functions
+        A structure holding other quantities calculated in the process,
+        including the shape functions that define the full solution.
 
     Algorithm
     ---------
-    As described in Nettelmann 2017 Appendix B.
+    Theory of figures equations and coefficients in Nettelmann 2017 Appendix B.
     """
 
     # Minimal input control
     zvec = np.array(zvec)
     dvec = np.array(dvec)
-    assert zvec.shape == dvec.shape
-    assert mrot >= 0
-    assert sskip >= 0
-    pass
-
-    # Initialize local variables
-    p = np.argsort(zvec)
+    p = np.argsort(zvec) # ToF equations easier to read w inside-out radii
     zvec = zvec[p]
     dvec = dvec[p]
     if zvec[0] == 0:
         zvec[0] = np.spacing(1)
-    N = len(zvec)
-    ss = 5*[np.zeros(N)]
+    assert zvec.shape == dvec.shape
+    assert mrot >= 0
 
     # Normalize radii and densities (it's safe to normalize a normal)
     dro = np.hstack((dvec[-1], np.diff(np.flipud(dvec))))
@@ -64,6 +70,15 @@ def tof4(zvec, dvec, mrot, tol=1e-6, maxiter=100, sskip=0, calc_moi=False):
     robar = m/zvec[-1]**3
     zvec = zvec/zvec[-1]
     dvec = dvec/robar
+
+    # Define and initialize local variables
+    N = len(zvec)
+    ss = 5*[np.zeros(N)]
+    if np.isscalar(xlevels):
+        sskip = int(max(np.fix(N/xlevels), 1))
+        xind = range(0, N, sskip)
+    else:
+        raise(Exception("Vector xlevels feature not yet implemented"))
 
     # The loop, following Nettelmann (2017) Appendix B
     Js = np.array([0, 0, 0, 0, 0]) # J0=0 ensures at least one iteration
@@ -75,10 +90,7 @@ def tof4(zvec, dvec, mrot, tol=1e-6, maxiter=100, sskip=0, calc_moi=False):
         SS = B9(zvec, dvec, fs)
 
         # And finally, the system of simultaneous equations B.12-B.15.
-        if sskip == 0:
-            ss = solve_B1215(ss, SS, mrot)
-        else:
-            ss = skipnspline_B1215(ss, SS, mrot, zvec, sskip)
+        ss = skipnspline_B1215(ss, SS, mrot, zvec, xind)
 
         # Now the Js, by eqs. B.1 and B.11
         new_Js, a0 = B111(ss, SS)
@@ -103,12 +115,15 @@ def tof4(zvec, dvec, mrot, tol=1e-6, maxiter=100, sskip=0, calc_moi=False):
     out.qrot = mrot*a0**3
     out.ss = ss
     out.SS = SS
+    #out.A0 = B4(ss,SS,mrot) #TODO: implement if/when need grav potential
     if calc_moi:
-        out.NMoI = NMoI(zvec, dvec, ss, out.a0)
+        out.NMoI = NMoI(zvec, dvec, ss, a0)
     else:
         out.NMoI = None
     return (Js, out)
 
+
+### Helper functions
 def NMoI(zi, rhoi, ss, a0):
     # Fast moment of inertia calculation (normalized by a0)
     rhoi = np.hstack((rhoi[0], (rhoi[:-1] + rhoi[1:])/2))
@@ -158,7 +173,7 @@ def mcumtrapz(X, Y):
     return cumtrapz(Y, X, initial=0)
 
 def B111(ss, SS):
-    # Nettelmann 2017 eqs. B.1 and B.11
+    # Return Js from SS, with Req/Rm a necessary bonus.
     N = len(ss[0]) - 1
     s0 = ss[0][N]; s2 = ss[1][N]; s4 = ss[2][N]; s6 = ss[3][N]; s8 = ss[4][N]
     S0 = SS[0][N]; S2 = SS[1][N]; S4 = SS[2][N]; S6 = SS[3][N]; S8 = SS[4][N]
@@ -252,61 +267,45 @@ def B1617(ss):
     fs = [f0, f2, f4, f6, f8, f0p, f2p, f4p, f6p, f8p]
     return fs
 
-def solve_B1215(ss0, SS, mrot):
-    # Solve the system B.12-B.15 for unknowns s2,s4,s6,s8.
-    from scipy.optimize import fsolve
+def skipnspline_B1215(ss0, SS, mrot, zvec, xind):
+    # Update the system B.12-B.15 for new s2,s4,s6,s8.
 
-    N = len(ss0[0])
-    Y = np.zeros((N,5))
-    for k in range(N):
-        es0 = [x[k] for x in ss0[1:]]
-        ES = [x[k] for x in SS]
-        es = fsolve(B1215, es0, args=(ES,mrot))
-        XX = np.concatenate((np.array((0.0, )), es))
-        XX[0] = -1/5*XX[1]**2 - 2/105*XX[1]**3 - 1/9*XX[2]**2 - 2/35*XX[1]**2*XX[2]
-        Y[k,:] = XX
-        pass
+    # Skip
+    Zs = np.array([S[xind] for S in SS]).T
+    zs = np.array([s[xind] for s in ss0]).T
+    newzs = B1215(zs, Zs, mrot)
+    newz0 = ((-1/5)*newzs[:,0]**2 - (2/105)*newzs[:,0]**3 -
+                (1/9)*newzs[:,1]**2 - 2/35*newzs[:,0]**2.*newzs[:,1])
+    newz0 = np.reshape(newz0, (newz0.size,1))
+    Y = np.hstack((newz0,newzs))
 
-    s0 = Y[:,0]; s2 = Y[:,1]; s4 = Y[:,2]; s6 = Y[:,3]; s8 = Y[:,4]
-    ss = [s0, s2, s4, s6, s8]
-    return ss
-
-def skipnspline_B1215(ss0, SS, mrot, zvec, sskip):
-    # Solve the system B.12-B.15 for unknowns s2,s4,s6,s8.
-    from scipy.optimize import fsolve
-    from scipy.interpolate import interp1d
-
-    N = len(ss0[0])
-    ind = np.arange(0, N, sskip)
-    Y = np.zeros((len(ind),5))
-    for k in range(len(ind)):
-        es0 = [x[ind[k]] for x in ss0[1:]]
-        ES = [x[ind[k]] for x in SS]
-        es = fsolve(B1215, es0, args=(ES,mrot))
-        XX = np.concatenate((np.array((0.0, )), es))
-        XX[0] = -1/5*XX[1]**2 - 2/105*XX[1]**3 - 1/9*XX[2]**2 - 2/35*XX[1]**2*XX[2]
-        Y[k,:] = XX
-        pass
-
-    X = zvec[ind]
-    s0 = interp1d(X, Y[:,0], 'cubic', fill_value='extrapolate')(zvec)
-    s2 = interp1d(X, Y[:,1], 'cubic', fill_value='extrapolate')(zvec)
-    s4 = interp1d(X, Y[:,2], 'cubic', fill_value='extrapolate')(zvec)
-    s6 = interp1d(X, Y[:,3], 'cubic', fill_value='extrapolate')(zvec)
-    s8 = interp1d(X, Y[:,4], 'cubic', fill_value='extrapolate')(zvec)
+    # And spline
+    if len(xind) < len(zvec):
+        X = zvec[xind]
+        s0 = interp1d(X, Y[:,0], 'cubic', fill_value='extrapolate')(zvec)
+        s2 = interp1d(X, Y[:,1], 'cubic', fill_value='extrapolate')(zvec)
+        s4 = interp1d(X, Y[:,2], 'cubic', fill_value='extrapolate')(zvec)
+        s6 = interp1d(X, Y[:,3], 'cubic', fill_value='extrapolate')(zvec)
+        s8 = interp1d(X, Y[:,4], 'cubic', fill_value='extrapolate')(zvec)
+    else:
+        s0 = Y[:,0]
+        s2 = Y[:,1]
+        s4 = Y[:,2]
+        s6 = Y[:,3]
+        s8 = Y[:,4]
     ss = [s0, s2, s4, s6, s8]
     return ss
 
 def B1215(s, S, m):
-    # Compute the RHS of B.12-B.15.
+    # Compute the RHS of B.12-B.15 and "solve" for sn.
 
-    s2 = s[0]; s4 = s[1]; s6 = s[2]; s8 = s[3] # s0 not needed
-    S0 = S[0]; S2 = S[1]; S4 = S[2]; S6 = S[3]; S8 = S[4]
-    S2p = S[6]; S4p = S[7]; S6p = S[8]; S8p = S[9] # S0p not needed
+    s2 = s[:,1]; s4 = s[:,2]; s6 = s[:,3]; # s0 and s8 not needed
+    S0 = S[:,0]; S2 = S[:,1]; S4 = S[:,2]; S6 = S[:,3]; S8 = S[:,4]
+    S2p = S[:,6]; S4p = S[:,7]; S6p = S[:,8]; S8p = S[:,9] # S0p not needed
 
-    # B.12
+    # B.12 (not including -s2S0)
     A2 = 0
-    A2 = A2 + S0*(-1*s2 + 2/7*s2**2 + 4/7*s2*s4 - 29/35*s2**3 + 100/693*s4**2 +
+    A2 = A2 + S0*(2/7*s2**2 + 4/7*s2*s4 - 29/35*s2**3 + 100/693*s4**2 +
                   454/1155*s2**4 - 36/77*s2**2*s4)
     A2 = A2 + S2*(1 - 6/7*s2 - 6/7*s4 + 111/35*s2**2 - 1242/385*s2**3 + 144/77*s2*s4)
     A2 = A2 + S4*(-10/7*s2 - 500/693*s4 + 180/77*s2**2)
@@ -314,9 +313,9 @@ def B1215(s, S, m):
     A2 = A2 + S4p*(8/7*s2 + 72/77*s2**2 + 400/693*s4)
     A2 = A2 + m/3*(-1 + 10/7*s2 + 9/35*s2**2 - 4/7*s4 + 20/77*s2*s4 - 26/105*s2**3)
 
-    # B.13
+    # B.13 (not including -s4S0)
     A4 = 0
-    A4 = A4 + S0*(-1*s4 + 18/35*s2**2 - 108/385*s2**3 + 40/77*s2*s4 +
+    A4 = A4 + S0*(18/35*s2**2 - 108/385*s2**3 + 40/77*s2*s4 +
                   90/143*s2*s6 + 162/1001*s4**2 + 16902/25025*s2**4 -
                   7369/5005*s2**2*s4)
     A4 = A4 + S2*(-54/35*s2 - 60/77*s4 + 648/385*s2**2 - 135/143*s6 +
@@ -330,9 +329,9 @@ def B1215(s, S, m):
     A4 = A4 + m/3*(-36/35*s2 + 114/77*s4 + 18/77*s2**2 - 978/5005*s2*s4 +
                    36/175*s2**3 - 90/143*s6)
 
-    # B.14
+    # B.14 (not including -s6S0)
     A6 = 0
-    A6 = A6 + S0*(-s6 + 10/11*s2*s4 - 18/77*s2**3 + 28/55*s2*s6 + 72/385*s2**4 +
+    A6 = A6 + S0*(10/11*s2*s4 - 18/77*s2**3 + 28/55*s2*s6 + 72/385*s2**4 +
                   20/99*s4**2 - 54/77*s2**2*s4)
     A6 = A6 + S2*(-15/11*s4 + 108/77*s2**2 - 42/55*s6 - 144/77*s2**3 + 216/77*s2*s4)
     A6 = A6 + S4*(-25/11*s2 - 100/99*s4 + 270/77*s2**2)
@@ -342,9 +341,9 @@ def B1215(s, S, m):
     A6 = A6 + S6p*(1 + 84/55*s2)
     A6 = A6 + m/3*(-10/11*s4 - 18/77*s2**2 + 34/77*s2*s4 + 82/55*s6)
 
-    # B.15
+    # B.15 (not including -s8S0)
     A8 = 0
-    A8 = A8 + S0*(-1*s8 + 56/65*s2*s6 + 72/715*s2**4 + 490/1287*s4**2 - 84/143*s2**2*s4)
+    A8 = A8 + S0*(56/65*s2*s6 + 72/715*s2**4 + 490/1287*s4**2 - 84/143*s2**2*s4)
     A8 = A8 + S2*(-84/65*s6 - 144/143*s2**3 + 336/143*s2*s4)
     A8 = A8 + S4*(-2450/1287*s4 + 420/143*s2**2)
     A8 = A8 + S6*(-196/65*s2)
@@ -355,8 +354,8 @@ def B1215(s, S, m):
     A8 = A8 + S8p*(1)
     A8 = A8 + m/3*(-56/65*s6 - 56/143*s2*s4)
 
-    A = [A2, A4, A6, A8]
-    return A
+    new_s = np.array((A2/S0, A4/S0, A6/S0, A8/S0)).T
+    return new_s
 
 def Upu(ss, SS, m):
     # Following Nettelmann 2017 eqs. B3 and B.4, assuming equipotential.
@@ -376,18 +375,19 @@ def Upu(ss, SS, m):
     return -A0
 
 def _test():
-    N = 2048
-    zvec = np.linspace(1, 1.0/N, N)
-    dvec = np.linspace(1/N,2,N)
-    mrot = 0.1
-    sskip = 32
-    Js, out = tof4(zvec, dvec, mrot, 1e-5, sskip=sskip)
+    N = 4096
+    zvec = np.linspace(1, 1/N, N)
+    dvec = np.linspace(0,1,N)
+    mrot = 0.08
+    nx = -1
+    Js, out = tof4(zvec, dvec, mrot, xlevels=nx)
     print("After {} iterations:".format(out.iter+1))
     print("J0 = {}".format(Js[0]))
     print("J2 = {}".format(Js[1]))
     print("J4 = {}".format(Js[2]))
     print("J6 = {}".format(Js[3]))
     print("J8 = {}".format(Js[4]))
+    print("a0 = {}".format(out.a0))
     print("q = {}".format(out.qrot))
     print("I = {}".format(out.NMoI))
     print("")

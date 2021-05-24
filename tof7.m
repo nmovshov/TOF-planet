@@ -181,7 +181,7 @@ p = inputParser;
 p.FunctionName = 'tof7.m';
 
 p.addParameter('C7file',mfilename('fullpath'))
-p.addParameter('tol',1e-6,@(x)isscalar(x)&&isreal(x)&&x>0)
+p.addParameter('tol',1e-8,@(x)isscalar(x)&&isreal(x)&&x>0)
 p.addParameter('maxiter',100,@(x)isscalar(x)&&isreal(x)&&x>0&&mod(x,1)==0)
 p.addParameter('xlevels',-1,@(x)validateattributes(x,{'numeric'},{'vector','integer'}))
 p.addParameter('ss_guesses',struct(),@(x)isscalar(x)&&isstruct(x))
