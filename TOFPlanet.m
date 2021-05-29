@@ -1041,6 +1041,11 @@ classdef TOFPlanet < handle
             s.J4     = obj.J4;
             s.J6     = obj.J6;
             s.J8     = obj.J8;
+            if obj.opts.toforder == 7
+                s.J10 = obj.Js(6);
+                s.J12 = obj.Js(7);
+                s.J14 = obj.Js(8);
+            end
             s.NMoI   = obj.NMoI;
             s.si     = obj.si;
             s.ai     = obj.ai;

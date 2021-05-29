@@ -74,7 +74,7 @@ narginchk(3,inf);
 % Mandatory inputs
 validateattributes(zvec,{'numeric'},{'finite','nonnegative','vector'},'','zvec',1)
 validateattributes(dvec,{'numeric'},{'finite','nonnegative','vector'},'','dvec',2)
-validateattributes(mrot,{'numeric'},{'finite','nonnegative','scalar'},'','qrot',3)
+validateattributes(mrot,{'numeric'},{'finite','nonnegative','scalar'},'','mrot',3)
 assert(length(zvec) == length(dvec),...
     'length(zvec)=%d~=%d=length(dvec)',length(zvec),length(dvec))
 [zvec, I] = sort(zvec);
