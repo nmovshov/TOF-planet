@@ -37,6 +37,7 @@ p.addParameter('MaxIterHE',60,@isposintscalar)
 p.addParameter('verbosity',1,@isnonnegintscalar)
 p.addParameter('debug',false,@islogicalscalar)
 p.addParameter('masmeth','trapz'); % undocumented mass integral method
+p.addParameter('prsmeth','trapz'); % undocumented pressure integral method
 p.addParameter('moimeth','midlayerz'); % undocumented moi integral method
 p.addParameter('xlevels',-1,@isintscalar)
 

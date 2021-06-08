@@ -1229,8 +1229,20 @@ classdef TOFPlanet < handle
             gradU(n) = (U(n-1) - U(n))/(r(n-1) - r(n));
             intgrnd = rho.*gradU;
             val(1) = obj.P0;
-            for k=1:n-1
-                val(k+1) = val(k) + 0.5*(r(k) - r(k+1))*(intgrnd(k) + intgrnd(k+1));
+            switch lower(obj.opts.prsmeth)
+                case 'trapz'
+                    for k=1:n-1
+                        val(k+1) = val(k) + 0.5*(r(k) - r(k+1))*(intgrnd(k) + intgrnd(k+1));
+                    end
+                case 'simps'
+                    h = mean(abs(diff(r)));
+                    val(2) = val(1) + (h/2)*(intgrnd(1) + intgrnd(2)); % trapz prime
+                    for k=3:n
+                        val(k) = val(k-2) + ...
+                            (h/3)*(intgrnd(k-2) + 4*intgrnd(k-1) + intgrnd(k));
+                    end
+                otherwise
+                    error('Unknown pressure integral method.')
             end
         end
         
