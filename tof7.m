@@ -74,7 +74,7 @@ narginchk(3,inf);
 % Mandatory inputs
 validateattributes(zvec,{'numeric'},{'finite','nonnegative','vector'},'','zvec',1)
 validateattributes(dvec,{'numeric'},{'finite','nonnegative','vector'},'','dvec',2)
-validateattributes(mrot,{'numeric'},{'finite','nonnegative','scalar'},'','qrot',3)
+validateattributes(mrot,{'numeric'},{'finite','nonnegative','scalar'},'','mrot',3)
 assert(length(zvec) == length(dvec),...
     'length(zvec)=%d~=%d=length(dvec)',length(zvec),length(dvec))
 [zvec, I] = sort(zvec);
@@ -185,11 +185,6 @@ p.addParameter('tol',1e-8,@(x)isscalar(x)&&isreal(x)&&x>0)
 p.addParameter('maxiter',100,@(x)isscalar(x)&&isreal(x)&&x>0&&mod(x,1)==0)
 p.addParameter('xlevels',-1,@(x)validateattributes(x,{'numeric'},{'vector','integer'}))
 p.addParameter('ss_guesses',struct(),@(x)isscalar(x)&&isstruct(x))
-
-% undocumented or obsolete options
-p.addParameter('nangles',48,@(x)isscalar(x)&&(x>0)&&(mod(x,1)==0)) % colatitudes defining level surface
-p.addParameter('kmax',30,@(x)isscalar(x)&&(x>6)&&(mod(x,2)==0)) % degree to cut mulitpole expansion
-p.addParameter('TolX',1e-12,@(x)isscalar(x)&&(x>0)) % termination tolerance for root finding
 
 % Parse name-value pairs and return
 p.parse(varargin{:})

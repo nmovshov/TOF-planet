@@ -2,14 +2,14 @@ function zvec = trizone(N, parts)
 %TRIZONE Return a 3-zone zvec distribution.
 %    zvec = TRIZONE(N) returns a vector of normalized radii with two thirds of
 %    them equally distributed in the top third, two thirds of the remainder
-%    equally distributed in the middle third, and the rest equally distributed in
-%    the bottom third of the interval (0,1].
+%    equally distributed in the middle third, and the rest equally distributed
+%    in the bottom third of the interval (0,1].
 %
-%    zvec = TRIZONE(N, parts) returns a vector of normalized radii with parts(1)
-%    of them equally distributed in the top third, parts(2) of the reaminder
-%    equally distributed in the middle third, and the rest equally distributed in
-%    the bottom third of the interval (0,1]. For example, the default spacing
-%    above is obtained with parts=[2/3, 2/3].
+%    zvec = TRIZONE(N, parts) returns a vector of normalized radii with
+%    parts(1) of them equally distributed in the top third, parts(2) of the
+%    reaminder equally distributed in the middle third, and the rest equally
+%    distributed in the bottom third of the interval (0,1]. For example, the
+%    default spacing above is obtained with parts=[2/3, 2/3].
 
 narginchk(1,2)
 if (nargin < 2) || isempty(parts), parts = [2/3, 2/3]; end

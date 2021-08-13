@@ -30,29 +30,23 @@
 clear
 clc
 close all
-debug = true;
-if debug
-    u = setUnits;
-else
-    u = setFUnits;
-end
-G = u.gravity;
+G = 6.67430e-11;
 
 %% Set up some TOF Planets with arbitrary mass and radius
-M = 317.8*u.earth_mass;
-R = 71492*u.km;
+M = 317.8*5.9722e+24;
+R = 71492e3;
 
 %#ok<*SAGROW>
 N = [128,256,512];
 for k=1:length(N)
-    tof(k) = TOFPlanet('debug', debug);
+    tof(k) = TOFPlanet();
     tof(k).name = ['TOF',int2str(N(k))];
     tof(k).mass = M;
     tof(k).radius = R;
     tof(k).si = R*linspace(1, 1/N(k), N(k))';
     tof(k).rhoi = ones(N(k),1)*M/(4*pi/3*R^3);
-    tof(k).mrot = 0;
-    tof(k).P0 = 0.0*u.bar;
+    tof(k).period = inf;
+    tof(k).P0 = 0.0;
 end
 
 %% Construct a polytrope of index 1 to represent the planet's eos
@@ -72,7 +66,7 @@ for k=1:length(N)
     tof(k).opts.dJtol = 1e-6;
     tof(k).opts.drhotol = 1e-6;
     tof(k).opts.MaxIterBar = 20; % default 40
-    tof(k).relax_to_barotrope;
+    tof(k).relax_to_barotrope();
 end
 
 %% Compare computed and analytic density structure
@@ -108,11 +102,11 @@ lh.FontSize = 12;
 
 % errors
 n = length(N);
-P_center = interp1(double(tof(n).si), double(tof(n).Pi), 0, 'pchip')*u.Pa;
+P_center = interp1(tof(n).si, tof(n).Pi, 0, 'pchip');
 P_err = (P_center - tof(n).eos.pressure(rho_c))/tof(n).eos.pressure(rho_c);
 s_tit = sprintf(['$N=%g$; ',...
     '$\\beta=%g$; $\\Delta P_c=%g\\%%$'],...
-    N(n), double(tof(n).betam), double(P_err)*100);
+    N(n), tof(n).betam, P_err*100);
 title(s_tit)
 
 % polytrope definitions

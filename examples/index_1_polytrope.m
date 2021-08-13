@@ -1,5 +1,5 @@
 %% GRAVITY COEFFICIENTS OF ROTATING INDEX-1 POLYTROPE
-% Example and test of the TofPlanet class. We construct and converge a model of
+% Example and test of the TOFPlanet class. We construct and converge a model of
 % a rotating fluid planet with the pressure-density law
 %
 % $$P = K\rho^2$$
@@ -14,7 +14,7 @@
 % to time. I take the numbers from Wisdom and Hubbard (2016) Table 3. For
 % consistency I try to replicate the Wisdom and Hubbard model exactly,
 % including using their values for G and K (Guillot, double hearsay) and trying
-% to match their q as close as possible with m.
+% to match their q with a rotation period.
 %
 % Also comparing with CMS results from Wisdom and Hubbard (2016) Table 4, and
 % with some q powers I dug out of the ZT red book that I think are supposed to
@@ -25,13 +25,12 @@
 clear
 clc
 close all
-u = setFUnits;
 
 %% Construct a polytrope of index 1, aiming for exact replicaiton of WH16
 G = 6.6738480e-11; % Hubbard to Guillot personal communcation
 GM = 1.266865361e17; % WH16
 M = GM/G;
-Re = 71492*u.km; % (to match K use K=2*G/pi*R^2 instead)
+Re = 71492*1e3; % (to match K use K=2*G/pi*R^2 instead)
 qrot = 0.089195487; % WH16
 wrot = sqrt(qrot*GM/Re^3);
 Prot = 2*pi/wrot;
@@ -52,7 +51,7 @@ tofour.radius = Re;
 tofour.period = Prot; % trying to match WH16 qrot
 tofour.si = Re*linspace(1, 1/N, N)'; % will be renormalized
 tofour.rhoi = ones(N,1)*M/(4*pi/3*Re^3); % will be renormalized
-tofour.P0 = 0*u.bar; % added to surface pressure
+tofour.P0 = 0; % added to surface pressure
 tofour.eos = eos;
 
 tofsev = TOFPlanet('toforder',7);
@@ -63,7 +62,7 @@ tofsev.radius = Re;
 tofsev.period = Prot; % trying to match WH16 qrot
 tofsev.si = Re*linspace(1, 1/N, N)'; % will be renormalized
 tofsev.rhoi = ones(N,1)*M/(4*pi/3*Re^3); % will be renormalized
-tofsev.P0 = 0*u.bar; % added to surface pressure
+tofsev.P0 = 0; % added to surface pressure
 tofsev.eos = eos;
 
 %% Relax to desired barotrope (fast for tof4, slow for tof7)
@@ -71,13 +70,13 @@ tofour.opts.drhotol = 1e-6;
 tofour.opts.dJtol = 1e-10;
 tofour.opts.MaxIterBar = 60;
 tofour.opts.MaxIterHE = 60;
-tofour.relax_to_barotrope;
+tofour.relax_to_barotrope();
 
 tofsev.opts.drhotol = 1e-6;
 tofsev.opts.dJtol = 1e-10;
 tofsev.opts.MaxIterBar = 60;
 tofsev.opts.MaxIterHE = 60;
-tofsev.relax_to_barotrope;
+tofsev.relax_to_barotrope();
 
 %% Construct the benchmarking table
 % The variables to compare are [Re/R, J2, J4, ..., J14]

@@ -7,17 +7,24 @@ classdef TOFPlanet < handle
     %   obj.rhoi, indexed from the surface in. To complete the definition the
     %   user must also specify a mass, equatorial radius, and rotation period.
     %   With these a gravity field and equilibrium shape can be determined,
-    %   with a call to obj.relax_to_HE().
+    %   with a call to obj.relax_to_HE(). Note, however, that the oblate shape
+    %   calculated with relax_to_HE() preserves the mass and mean radius of the
+    %   planet, but not the equatorial radius. A call to fix_radius()
+    %   renormalizs the si vector to match the reference equatorial radius, at
+    %   the cost of modifying the implied mass. A call to renormalize()
+    %   modifies both si and rhoi to preserve the reference mass and equatorial
+    %   radius, at the cost of modifying the assigned density. It is not
+    %   possible to define mass, radius, and density simultaneously.
     %
     %   Alternatively the user may supply a barotrope object, stored in
     %   obj.eos, and call obj.relax_to_barotrope() to iteratively find a
     %   density profile consistent with the calculated equilibrium pressure. To
     %   this end a boundary pressure must also be given, in obj.P0, and an
     %   initial density profile guess is still required (can be a simple one).
-    %   Note that we can't simultaneously impose an exact mass/radius and
+    %   Again, we can't simultaneously impose an exact mass, radius, and
     %   barotrope. By default the reference mass and radius will be honored, by
     %   renormalizing the converged density profile, and this will modify the
-    %   effective barotrope (to override set obj.opts.renorm=false).
+    %   _effective_ barotrope (to override set obj.opts.renorm=false).
     
     %% Properties
     properties
@@ -39,25 +46,19 @@ classdef TOFPlanet < handle
         SS     % shape functions (returned by tof<n>.m)
         A0     % dimensionless potential (returned by tof<n>.m)
         Js     % external gravity coefficients (returned by tof<n>.m)
-        betam  % mass renormalization factor (obj.mass/obj.M)
-        alfar  % radius renormalization factor (obj.radius/obj.a0)
+        betam  % mass renormalization factor returned by obj.renormalize()
+        alfar  % radius renormalization factor returned by obj.renormalize()
     end
     properties (Dependent)
         M      % calculated mass (equal to mass *after* renorm)
         a0     % calculated equatorial radius (equal to radius *after* renorm)
         mi     % cumulative mass below si
         ai     % equatorial radii on level surfaces
-        zi     % mass fraction in heavy elements
-        mzi    % cumulative heavy elements mass below si
-        Ki     % empirical bulk modulus (rho*dP/drho)
-        M_Z    % estimated total heavy elements mass
         s0     % surface mean radius (another name for obj.si(1))
         rhobar % calculated mean density
         wrot   % rotation frequency, 2pi/period
         qrot   % rotation parameter wrot^2a0^3/GM
         mrot   % rotation parameter, wrot^2s0^3/GM
-        Ui     % gravitational potential on grid
-        Pi     % hydrostatic pressure on grid
         J2     % convenience alias to obj.Js(2)
         J4     % convenience alias to obj.Js(3)
         J6     % convenience alias to obj.Js(4)
@@ -66,7 +67,6 @@ classdef TOFPlanet < handle
     properties (GetAccess = private)
         aos    % calculated equatorial to mean radius ratio (from tof<n>.m)
         G      % Gravitational constant
-        u      % let's hold a units struct for convenience
     end
     
     %% A simple constructor
@@ -80,19 +80,7 @@ classdef TOFPlanet < handle
             
             % Init privates
             obj.aos = 1;
-            try
-                if obj.opts.debug
-                    obj.u = setUnits;
-                else
-                    obj.u = setFUnits;
-                end
-                obj.G = obj.u.gravity;
-            catch ME
-                if isequal(ME.identifier,'MATLAB:UndefinedFunction')
-                    error('Check your path, did you forget to run setws()?\n%s',ME.message)
-                end
-                rethrow(ME)
-            end
+            obj.G = 6.67430e-11; % m^3 kg^-1 s^-2 (2018 NIST reference)
         end
     end % End of constructor block
     
@@ -146,13 +134,13 @@ classdef TOFPlanet < handle
             end
             if isempty(obj.mrot)
                 warning('TOFPLANET:assertion',...
-                    'First set rotation parameter (<obj>.mrot).')
+                    'First set rotation period (<obj>.period).')
                 return
             end
             if isempty(obj.P0)
                 warning('TOFPLANET:P0',...
-                    'Setting reference pressure to zero (<obj>.P0=0).')
-                obj.P0 = 0*obj.u.bar;
+                    'First set reference pressure (<obj>.P0).')
+                return
             end
             
             % Optional communication
@@ -199,16 +187,17 @@ classdef TOFPlanet < handle
                 obj.SS = structfun(@flipud, out.SS, 'UniformOutput', false);
                 obj.aos = out.a0;
                 obj.A0 = flipud(out.A0);
-
+                
                 % Update density from barotrope and renormalize
-                obj.update_densities;
-                obj.renormalize;
-
+                obj.update_densities();
+                obj.renormalize();
+                
                 % Calculate changes in shape/density
                 dJs = abs((obj.Js - old_Js)./old_Js);
-                dJs = max(double(dJs(isfinite(dJs))));
+                dJs = max(dJs(isfinite(dJs)));
                 dro = obj.rhoi./old_ro;
-                dro = var(double(dro(isfinite(dro))));
+                dro = var(dro(isfinite(dro)));
+                
                 if (verb > 0)
                     fprintf('Baropass %d (of max %d)...done. (%g sec)\n',...
                         iter, obj.opts.MaxIterBar, toc(t_pass))
@@ -217,7 +206,7 @@ classdef TOFPlanet < handle
                 end
                 
                 % The stopping criterion is to satisfy both J and rho tolerance
-                if (dro < obj.opts.drhotol) && all(dJs < obj.opts.dJtol)
+                if (dro < obj.opts.drhotol) && dJs < obj.opts.dJtol
                     break
                 end
                 
@@ -231,7 +220,7 @@ classdef TOFPlanet < handle
             
             % Renorm and record factors
             % TODO: if we still need betam we must fix this
-            renorms = obj.renormalize;
+            renorms = obj.renormalize();
             obj.alfar = renorms(1);
             obj.betam = renorms(2);
             
@@ -254,8 +243,8 @@ classdef TOFPlanet < handle
             end
             
             t_rlx = tic;
-            zvec = double(obj.si/obj.si(1));
-            dvec = double(obj.rhoi/obj.rhobar);
+            zvec = obj.si/obj.si(1);
+            dvec = obj.rhoi/obj.rhobar;
             if isempty(obj.ss)
                 ss_guess = struct();
             else
@@ -286,8 +275,7 @@ classdef TOFPlanet < handle
             % Set level surface densities to match prescribed barotrope.
             
             if isempty(obj.eos)
-                warning('Make sure input barotrope (<obj>.eos) is set.')
-                return
+                error('TOFPLANET:noeos','Make sure input barotrope (<obj>.eos) is set.')
             end
             
             t_rho = tic;
@@ -330,6 +318,26 @@ classdef TOFPlanet < handle
             ab = [a, b];
         end
         
+        function obj = fix_radius(obj)
+            % Resize planet to match equatorial radius to observed value.
+            
+            if isempty(obj.radius) || isempty(obj.a0) || isempty(obj.si)
+                warning('TOFPLANET:noref','Missing information; no action.')
+                return
+            end
+            obj.si = obj.si*obj.radius/obj.a0;
+        end
+        
+        function obj = fix_mass(obj)
+            % Rescale density to match planet mass to observed value.
+            
+            if isempty(obj.mass) || isempty(obj.rhoi)
+                warning('TOFPLANET:noref','Missing information; no action.')
+                return
+            end
+            obj.rhoi = obj.rhoi*obj.mass/obj.M;
+        end
+        
         function r = level_surface(obj, el, theta)
             % Return r_l(theta) by expansion of Legendre polynomials.
             
@@ -359,7 +367,7 @@ classdef TOFPlanet < handle
                 s(k) = ((V/(4*pi/3))^(1/3) - obj.si(k))/obj.si(k);
             end
         end
-
+        
         function I = NMoI(obj, reduce)
             % Return moment of inertia normalized by a0.
             
@@ -400,7 +408,6 @@ classdef TOFPlanet < handle
             switch lower(method)
                 case 'trapz'
                     m = -4*pi*trapz(double(obj.si), double(obj.rhoi.*obj.si.^2));
-                    m = m*obj.u.kg;
                 case 'layerz'
                     drho = [obj.rhoi(1); diff(obj.rhoi)];
                     m = (4*pi/3)*sum(drho.*obj.si.^3);
@@ -414,15 +421,6 @@ classdef TOFPlanet < handle
             end
         end
         
-        function obj = fix_radius(obj)
-            % Resize planet to match equatorial radius to observed value.
-            
-            if isempty(obj.radius) || isempty(obj.a0) || isempty(obj.si)
-                warning('Missing information; no action.')
-                return
-            end
-            obj.si = obj.si*obj.radius/obj.a0;
-        end
     end % End of public methods block
     
     %% Visualizers
@@ -961,14 +959,13 @@ classdef TOFPlanet < handle
             try
                 obj.J2;
             catch
-                warning('Uncooked object.')
+                warning('Uncooked object.') %#ok<*WNTAG>
                 return
             end
             
             % Basic table
             vitals = {'Mass [kg]'; 'R_eq [km]'; 'J2'; 'J4'; 'J6'; 'J8'; 'NMoI'};
             TOF1 = [obj.M; obj.a0/1e3; obj.J2; obj.J4; obj.J6; obj.J8; obj.NMoI];
-            TOF1 = double(TOF1);
             T = table(TOF1, 'RowNames', vitals);
             if ~isempty(obj.name)
                 vname = matlab.lang.makeValidName(obj.name);
@@ -1033,7 +1030,6 @@ classdef TOFPlanet < handle
             s.M      = obj.M;
             s.s0     = obj.s0;
             s.a0     = obj.a0;
-            s.M_Z    = obj.M_Z;
             s.rhobar = obj.rhobar;
             s.mrot   = obj.mrot;
             s.qrot   = obj.qrot;
@@ -1052,7 +1048,6 @@ classdef TOFPlanet < handle
             s.rhoi   = obj.rhoi;
             s.Pi     = obj.Pi;
             s.mi     = obj.mi;
-            s.zi     = obj.zi;
             
             if rdc > 0
                 s = structfun(@double, s, 'UniformOutput', false);
@@ -1068,7 +1063,6 @@ classdef TOFPlanet < handle
                 s.rhoi   = [];
                 s.Pi     = [];
                 s.mi     = [];
-                s.zi     = [];
             end
             
             try
@@ -1095,7 +1089,7 @@ classdef TOFPlanet < handle
         end
         
         function T = to_table(obj)
-            % Create table of critical quantities.
+            % Return a table of critical quantities.
             
             T = table;
             T.ai = double(obj.ai);
@@ -1103,9 +1097,6 @@ classdef TOFPlanet < handle
             T.rhoi = double(obj.rhoi);
             T.Pi = double(obj.Pi);
             T.mi = double(obj.mi);
-            if ~isempty(obj.zi)
-                T.zi = double(obj.zi);
-            end
         end
         
         function to_ascii(obj, fname)
@@ -1123,17 +1114,19 @@ classdef TOFPlanet < handle
             cleanup = onCleanup(@()fclose(fid));
             
             % Write the header
-            fprintf(fid,'# Rotating fluid planet modeled by 4th-order Theory of Figures.\n');
+            fprintf(fid,'# Rotating fluid planet modeled by %dth-order Theory of Figures.\n',...
+                        obj.opts.toforder);
             fprintf(fid,'#\n');
             fprintf(fid,'# Model name: %s\n', obj.name);
             fprintf(fid,'#\n');
             fprintf(fid,'# Scalar quantities:\n');
             fprintf(fid,'# N layers = %d\n',obj.N);
-            fprintf(fid,'# Mass M = %g kg\n', double(obj.M));
-            fprintf(fid,'# Mean radius       s0 = %0.6e m\n', double(obj.s0));
-            fprintf(fid,'# Equatorial radius a0 = %0.6e m\n', double(obj.a0));
-            fprintf(fid,'# Rotation parameter m = %0.6f\n', double(obj.mrot));
-            fprintf(fid,'# Rotation parameter q = %0.6f\n', double(obj.qrot));
+            fprintf(fid,'# Mass M = %g kg\n', obj.M);
+            fprintf(fid,'# Mean radius       s0 = %0.6e m\n', obj.s0);
+            fprintf(fid,'# Equatorial radius a0 = %0.6e m\n', obj.a0);
+            fprintf(fid,'# Rotation period P = %0.6g s\n', obj.period);
+            fprintf(fid,'# Rotation parameter m = %0.6f\n', obj.mrot);
+            fprintf(fid,'# Rotation parameter q = %0.6f\n', obj.qrot);
             fprintf(fid,'#\n');
             fprintf(fid,'# Calculated gravity zonal harmonics (x 10^6):\n');
             fprintf(fid,'# J2  = %12.6f\n', obj.J2*1e6);
@@ -1159,10 +1152,10 @@ classdef TOFPlanet < handle
             fprintf(fid,'\n');
             for k=1:obj.N
                 fprintf(fid,'  %-4d  ',k);
-                fprintf(fid,'%10.4e  ', double(obj.si(k)));
-                fprintf(fid,'%10.4e  ', double(obj.ai(k)));
-                fprintf(fid,'%7.1f  ', double(obj.rhoi(k)));
-                fprintf(fid,'%10.4e  ', double(obj.Pi(k)), double(obj.mi(k)));
+                fprintf(fid,'%10.4e  ', obj.si(k));
+                fprintf(fid,'%10.4e  ', obj.ai(k));
+                fprintf(fid,'%7.1f  ', obj.rhoi(k));
+                fprintf(fid,'%10.4e  ', obj.Pi(k), obj.mi(k));
                 fprintf(fid,'\n');
             end
         end
@@ -1170,6 +1163,17 @@ classdef TOFPlanet < handle
     
     %% Private (or obsolete) methods
     methods (Access = private)
+        function val = Ki(obj)
+            P = obj.Pi;
+            ro = obj.rhoi;
+            if isempty(P) || isempty(ro)
+                val = [];
+            else
+                dPdro = sdderiv(ro,P);
+                val = ro.*dPdro;
+            end
+        end
+        
         function y = P_mid(obj)
             % Pressure interpolated to halfway between level surfaces.
             
@@ -1177,17 +1181,67 @@ classdef TOFPlanet < handle
             if isempty(v), y = []; return, end
             x = double(obj.si);
             xq = [(x(1:end-1) + x(2:end))/2; x(end)/2];
-            y = interp1(x, v, xq, 'pchip')*obj.u.Pa;
+            y = interp1(x, v, xq, 'pchip');
         end
+        
+        function val = mzi(obj)
+            % heavy element mass below level i
+            z = obj.zi;
+            if isempty(obj.si) || isempty(obj.rhoi) || isempty(z)
+                val = [];
+            else
+                rho = obj.rhoi;
+                s = obj.si;
+                val(obj.N) = 4*pi/3*rho(obj.N)*s(obj.N)^3*z(obj.N);
+                for k=obj.N-1:-1:1
+                    cz = max(min(z(k), 1), 0);
+                    val(k) = val(k+1) + 4*pi/3*rho(k)*(s(k)^3 - s(k+1)^3)*cz;
+                end
+                val = val';
+            end
+        end
+        
+        function val = zi(obj)
+            % heavy element mass fraction on level i
+            P = obj.Pi;
+            if isempty(obj.bgeos) || isempty(obj.fgeos) || isempty(P)
+                val = [];
+            else
+                roxy = obj.bgeos.density(P);
+                roz = obj.fgeos.density(P);
+                ro = obj.rhoi;
+                val = (1./ro - 1./roxy)./(1./roz - 1./roxy);
+                val(~isfinite(val)) = 0;
+            end
+        end
+        
+        function val = M_Z(obj)
+            try
+                val = obj.mzi(1);
+            catch
+                val = [];
+            end
+        end
+        
     end % End of private methods block
     
-    %% Access methods
+    %% Access and pseudo-access methods
     methods
         function set.name(obj,val)
             if ~isempty(val)
                 validateattributes(val, {'char'}, {'row'})
             end
             obj.name = val;
+        end
+        
+        function set.mass(obj,val)
+            validateattributes(val,{'numeric'},{'positive','scalar'})
+            obj.mass = val;
+        end
+        
+        function set.radius(obj,val)
+            validateattributes(val,{'numeric'},{'positive','scalar'})
+            obj.radius = val;
         end
         
         function set.si(obj, val)
@@ -1204,57 +1258,6 @@ classdef TOFPlanet < handle
                 warning('TOFPLANET:assertion','negative density. Is this on purpose?')
             end
             obj.rhoi = val(:);
-        end
-        
-        function val = get.Ui(obj)
-            % Following Nettelmann 2017 eqs. B3 and B.4, assuming equipotential.
-            if isempty(obj.A0), val = []; return, end
-            
-            val = -obj.G*obj.mass/obj.s0^3*obj.si.^2.*obj.A0; %TODO: decide on mass versus M
-        end
-                
-        function val = get.Pi(obj)
-            if isempty(obj.Ui) || isempty(obj.rhoi) || isempty(obj.P0)
-                val = [];
-                return
-            end
-            n = obj.N;
-            U = obj.Ui;
-            rho = obj.rhoi;
-            r = obj.si;
-            gradU = zeros(n,1)*U(1)/r(1); % for units in dbg mode
-            val = zeros(n,1)*rho(1)*U(1); % for units in dbg mode
-            gradU(1) = (U(1) - U(2))/(r(1) - r(2));
-            gradU(2:n-1) = (U(1:n-2) - U(3:n))./(r(1:n-2) - r(3:n));
-            gradU(n) = (U(n-1) - U(n))/(r(n-1) - r(n));
-            intgrnd = rho.*gradU;
-            val(1) = obj.P0;
-            switch lower(obj.opts.prsmeth)
-                case 'trapz'
-                    for k=1:n-1
-                        val(k+1) = val(k) + 0.5*(r(k) - r(k+1))*(intgrnd(k) + intgrnd(k+1));
-                    end
-                case 'simps'
-                    h = mean(abs(diff(r)));
-                    val(2) = val(1) + (h/2)*(intgrnd(1) + intgrnd(2)); % trapz prime
-                    for k=3:n
-                        val(k) = val(k-2) + ...
-                            (h/3)*(intgrnd(k-2) + 4*intgrnd(k-1) + intgrnd(k));
-                    end
-                otherwise
-                    error('Unknown pressure integral method.')
-            end
-        end
-        
-        function val = get.Ki(obj)
-            P = obj.Pi;
-            ro = obj.rhoi;
-            if isempty(P) || isempty(ro)
-                val = [];
-            else
-                dPdro = sdderiv(ro,P);
-                val = ro.*dPdro;
-            end
         end
         
         function set.eos(obj,val)
@@ -1278,7 +1281,7 @@ classdef TOFPlanet < handle
             end
             obj.bgeos = val;
         end
-
+        
         function set.fgeos(obj,val)
             if isempty(val)
                 obj.fgeos = [];
@@ -1288,78 +1291,6 @@ classdef TOFPlanet < handle
                 error('fgeos must be a valid instance of class Barotrope')
             end
             obj.fgeos = val;
-        end
-        
-        function val = get.M(obj)
-            if isempty(obj.si) || isempty(obj.rhoi)
-                val = [];
-            else
-                val = obj.total_mass(obj.opts.masmeth);
-            end
-        end
-        
-        function set.mass(obj,val)
-            validateattributes(val,{'numeric'},{'positive','scalar'})
-            obj.mass = val;
-        end
-        
-        function set.radius(obj,val)
-            validateattributes(val,{'numeric'},{'positive','scalar'})
-            obj.radius = val;
-        end
-        
-        function val = get.mi(obj)
-            % mass _below_ level i
-            if isempty(obj.si) || isempty(obj.rhoi)
-                val = [];
-            else
-                rho = obj.rhoi;
-                s = obj.si;
-                val(obj.N) = 4*pi/3*rho(obj.N)*s(obj.N)^3;
-                for k=obj.N-1:-1:1
-                    val(k) = val(k+1) + 4*pi/3*rho(k)*(s(k)^3 - s(k+1)^3);
-                end % TODO: switch to cumtrapz
-                val = val';
-            end
-        end
-        
-        function val = get.mzi(obj)
-            % heavy element mass below level i
-            z = obj.zi;
-            if isempty(obj.si) || isempty(obj.rhoi) || isempty(z)
-                val = [];
-            else
-                rho = obj.rhoi;
-                s = obj.si;
-                val(obj.N) = 4*pi/3*rho(obj.N)*s(obj.N)^3*z(obj.N);
-                for k=obj.N-1:-1:1
-                    cz = max(min(z(k), 1), 0);
-                    val(k) = val(k+1) + 4*pi/3*rho(k)*(s(k)^3 - s(k+1)^3)*cz;
-                end
-                val = val';
-            end
-        end
-        
-        function val = get.zi(obj)
-            % heavy element mass fraction on level i
-            P = obj.Pi;
-            if isempty(obj.bgeos) || isempty(obj.fgeos) || isempty(P)
-                val = [];
-            else
-                roxy = obj.bgeos.density(P);
-                roz = obj.fgeos.density(P);
-                ro = obj.rhoi;
-                val = (1./ro - 1./roxy)./(1./roz - 1./roxy);
-                val(~isfinite(val)) = 0;
-            end
-        end
-        
-        function val = get.M_Z(obj)
-            try
-                val = obj.mzi(1);
-            catch
-                val = [];
-            end
         end
         
         function val = get.s0(obj)
@@ -1378,6 +1309,75 @@ classdef TOFPlanet < handle
             else
                 error('length(si) = %g ~= length(rhoi) = %g',...
                     length(obj.si),length(obj.rhoi))
+            end
+        end
+        
+        function val = Ui(obj, ind)
+            % Following Nettelmann 2017 eqs. B3 and B.4, assuming equipotential.
+            if isempty(obj.A0), val = []; return, end
+            
+            val = -obj.G*obj.mass/obj.s0^3*obj.si.^2.*obj.A0;
+            if nargin > 1
+                val = val(ind);
+            end
+        end
+        
+        function val = Pi(obj, ind)
+            if isempty(obj.Ui) || isempty(obj.rhoi) || isempty(obj.P0)
+                val = [];
+                return
+            end
+            n = obj.N;
+            U = obj.Ui;
+            rho = obj.rhoi;
+            r = obj.si;
+            gradU = zeros(n,1);
+            val = zeros(n,1);
+            gradU(1) = (U(1) - U(2))/(r(1) - r(2));
+            gradU(2:n-1) = (U(1:n-2) - U(3:n))./(r(1:n-2) - r(3:n));
+            gradU(n) = (U(n-1) - U(n))/(r(n-1) - r(n));
+            intgrnd = rho.*gradU;
+            val(1) = obj.P0;
+            switch lower(obj.opts.prsmeth)
+                case 'trapz'
+                    for k=1:n-1
+                        val(k+1) = val(k) + 0.5*(r(k) - r(k+1))*(intgrnd(k) + intgrnd(k+1));
+                    end
+                case 'simps'
+                    h = mean(abs(diff(r)));
+                    val(2) = val(1) + (h/2)*(intgrnd(1) + intgrnd(2)); % trapz prime
+                    for k=3:n
+                        val(k) = val(k-2) + ...
+                            (h/3)*(intgrnd(k-2) + 4*intgrnd(k-1) + intgrnd(k));
+                    end
+                otherwise
+                    error('Unknown pressure integral method.')
+            end
+            if nargin > 1
+                val = val(ind);
+            end
+        end
+        
+        function val = get.M(obj)
+            if isempty(obj.si) || isempty(obj.rhoi)
+                val = [];
+            else
+                val = obj.total_mass(obj.opts.masmeth);
+            end
+        end
+        
+        function val = get.mi(obj)
+            % mass _below_ level i
+            if isempty(obj.si) || isempty(obj.rhoi)
+                val = [];
+            else
+                rho = obj.rhoi;
+                s = obj.si;
+                val(obj.N) = 4*pi/3*rho(obj.N)*s(obj.N)^3;
+                for k=obj.N-1:-1:1
+                    val(k) = val(k+1) + 4*pi/3*rho(k)*(s(k)^3 - s(k+1)^3);
+                end % TODO: switch to cumtrapz
+                val = val';
             end
         end
         
@@ -1403,10 +1403,9 @@ classdef TOFPlanet < handle
             val = obj.wrot^2.*obj.s0^3./GM;
         end
         
-        function set.mrot(obj,val)
-            warning('TOFPLANET:deprecation',...
+        function set.mrot(~,~)
+            error('TOFPLANET:deprecation',...
                 'Setting mrot is deprecated; set a reference period instead.')
-            obj.period = (2*pi)/sqrt(val*obj.G*obj.M/obj.s0^3);
         end
         
         function val = get.a0(obj)

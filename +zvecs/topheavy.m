@@ -1,12 +1,12 @@
 function zvec = topheavy(N, skew)
 %TOPHEAVY Return a zvec distribution with top-heavy spacing.
-%    zvec = TOPHEAVY(N) returns a vector of normalized radii with three quarters
-%    of them equally distributed in the top half and the rest equally distributed
-%    in the bottom half of the interval (0,1].
+%    zvec = TOPHEAVY(N) returns a vector of normalized radii with three
+%    quarters of them equally distributed in the top half and the rest equally
+%    distributed in the bottom half of the interval (0,1].
 %
-%    zvec = TOPHEAVY(N, skew) returns a vector of normalized radii with skew(1) of
-%    them equally distributed in the interval [1-skew(2), 1] and the rest equally
-%    distributed in the interval (0, 1-skew(2)].
+%    zvec = TOPHEAVY(N, skew) returns a vector of normalized radii with skew(1)
+%    of them equally distributed in the interval [1-skew(2), 1] and the rest
+%    equally distributed in the interval (0, 1-skew(2)].
 
 narginchk(1,2)
 if (nargin < 2) || isempty(skew), skew = [3/4, 1/2]; end

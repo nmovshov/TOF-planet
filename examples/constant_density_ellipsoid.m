@@ -1,11 +1,12 @@
 %% MACLAURIN ELLIPSOID WITH TOF
-% The Maclaurin spheroid is a closed analytic solution for the shape of a
+% The Maclaurin ellipsoid is a closed analytic solution for the shape of a
 % rotating *constant density* self-gravitating fluid. This script compares the
 % numerical ToF solutions with the expected analytic solution.
 
 %% Maclaurin's solution
-% The equilibrium shape of a constant density rotating fluid can be shown (not
-% by me!) to be an ellipsoid of revolution such that the radius $r$ follows
+% The equilibrium shape of a constant density rotating fluid can be shown
+% (although not by me) to be an ellipsoid of revolution such that the radius
+% $r$ follows
 % 
 % $$r^2(\mu) = \frac{a^2}{1 + l^2\mu^2}$$
 % 
@@ -37,7 +38,8 @@ xi_exact = @(mu)1./sqrt((1 + (el^2).*(mu.^2)));
 
 %% Take a quick look for sanity check
 theta = linspace(0,2*pi);
-polax = polarplot(theta, xi_exact(cos(theta)), 'DisplayName','Maclaurin''s solution');
+polax = polarplot(theta, xi_exact(cos(theta)));
+polax.DisplayName = 'Maclaurin''s solution';
 polax.Parent.ThetaZeroLocation = 'top';
 polax.Parent.ThetaDir = 'clockwise';
 polax.Parent.ThetaAxisUnits = 'rad';
