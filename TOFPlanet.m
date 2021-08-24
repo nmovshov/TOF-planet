@@ -63,6 +63,8 @@ classdef TOFPlanet < handle
         J4     % convenience alias to obj.Js(3)
         J6     % convenience alias to obj.Js(4)
         J8     % convenience alias to obj.Js(5)
+        J10    % convenience alias to obj.Js(6)
+        J12    % convenience alias to obj.Js(7)
     end
     properties (GetAccess = private)
         aos    % calculated equatorial to mean radius ratio (from tof<n>.m)
@@ -1459,6 +1461,22 @@ classdef TOFPlanet < handle
                 val = 0;
             else
                 val = obj.Js(5);
+            end
+        end
+        
+        function val = get.J10(obj)
+            if isempty(obj.Js) || (length(obj.Js) < 6)
+                val = 0;
+            else
+                val = obj.Js(6);
+            end
+        end
+        
+        function val = get.J12(obj)
+            if isempty(obj.Js) || (length(obj.Js) < 7)
+                val = 0;
+            else
+                val = obj.Js(7);
             end
         end
         
