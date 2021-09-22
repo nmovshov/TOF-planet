@@ -1341,6 +1341,10 @@ classdef TOFPlanet < handle
             intgrnd = rho.*gradU;
             val(1) = obj.P0;
             switch lower(obj.opts.prsmeth)
+                case 'eq6'
+                    for k=1:n-1
+                        val(k+1) = val(k) + 0.5*(rho(k) + rho(k+1))*(U(k+1) - U(k));
+                    end
                 case 'trapz'
                     for k=1:n-1
                         val(k+1) = val(k) + 0.5*(r(k) - r(k+1))*(intgrnd(k) + intgrnd(k+1));
