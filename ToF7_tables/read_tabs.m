@@ -5,9 +5,9 @@ clc
 %% The f_n and f'_n coefficients
 % After the header and global 7, each block is headed by a 3-int row. The first
 % is the n in f_n (0 to 14); the second is always zero; the third is the number
-% of rows in the block. A row consists of a useless mystery number followed by
-% 7 powers to raise s_i by followed by the coefficient to multiply those
-% products by to get f_n or f'_n.
+% of rows in the block. A row consists of an unused number followed by 7 powers
+% to raise s_i by followed by the coefficient to multiply those products by to
+% get f_n or f'_n.
 
 f_coeffs = struct();
 
@@ -55,11 +55,11 @@ end
 
 %% The A_k coefficients (equiv. of B12-B15 in Nettellmann 2017)
 % After the header and global 7, each block is headed by a 3-int row. The first
-% is the n in S_n or S'_n; the second is k in A_k; the third is the number
-% of rows in the block. A row consists of a useless mystery number followed by
-% 7 powers to raise s_i by followed by the coefficient to multiply those
-% products by, to get one term in the big parentheses in front of S_n or S'_n,
-% in the RHS of the non-linear equations to solve (for s_i).
+% is the n in S_n or S'_n; the second is k in A_k; the third is the number of
+% rows in the block. A row consists of an unused number followed by 7 powers to
+% raise s_i by followed by the coefficient to multiply those products by, to
+% get one term in the big parentheses in front of S_n or S'_n, in the RHS of
+% the non-linear equations to solve (for s_i).
 
 A_coeffs = struct();
 

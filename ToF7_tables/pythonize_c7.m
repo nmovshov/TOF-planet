@@ -4,7 +4,7 @@ function dc7 = pythonize_c7(C7,dumpname)
 % When Matlab convertes a struct to a python dict 2d arrays are converted to a
 % python memoryview object. Their data is not copied. This is usually fine but
 % it makes it hard to serialize with pickle or json. So here we loop over the
-% relevant dict keys and manually populae them with the full data, by calls the
+% relevant dict keys and manually populate them with the full data, by calls to
 % the memoryview.tolist() method, making them nested lists.
 %
 % With nonempty dumpname the output dict will also be json.dumped to that file.
