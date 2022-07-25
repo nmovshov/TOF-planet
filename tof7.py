@@ -643,7 +643,7 @@ def _test():
     from timeit import default_timer as timer
     N = 1024
     zvec = np.linspace(1, 1/N, N)*1e7
-    dvec = np.linspace(0,1,N)*4000
+    dvec = -3000*zvec**2 + 3000
     mrot = 0.08
     nx = 128
     tic = timer()

@@ -115,7 +115,7 @@ def tof4(zvec, dvec, mrot, xlevels=-1, tol=1e-6, maxiter=100, calc_moi=False):
     out.qrot = mrot*a0**3
     out.ss = ss
     out.SS = SS
-    #out.A0 = B4(ss,SS,mrot) #TODO: implement if/when need grav potential
+    out.A0 = B4(ss,SS,mrot)
     if calc_moi:
         out.NMoI = NMoI(zvec, dvec, ss, a0)
     else:
@@ -275,7 +275,7 @@ def skipnspline_B1215(ss0, SS, mrot, zvec, xind):
     zs = np.array([s[xind] for s in ss0]).T
     newzs = B1215(zs, Zs, mrot)
     newz0 = ((-1/5)*newzs[:,0]**2 - (2/105)*newzs[:,0]**3 -
-                (1/9)*newzs[:,1]**2 - 2/35*newzs[:,0]**2.*newzs[:,1])
+                (1/9)*newzs[:,1]**2 - 2/35*newzs[:,0]**2*newzs[:,1])
     newz0 = np.reshape(newz0, (newz0.size,1))
     Y = np.hstack((newz0,newzs))
 
@@ -295,6 +295,23 @@ def skipnspline_B1215(ss0, SS, mrot, zvec, xind):
         s8 = Y[:,4]
     ss = [s0, s2, s4, s6, s8]
     return ss
+
+def B4(ss, SS, m):
+    # Compute the RHS of B.4 in Nettelmann (2017).
+    s2 = ss[1]; s4 = ss[2]
+    S0 = SS[0]; S2 = SS[1]; S4 = SS[2]
+    S0p = SS[5]; S2p = SS[6]; S4p = SS[7]
+
+    A0 = np.zeros_like(s2)
+    A0 = A0 + S0*(1 + (2/5)*s2**2 - (4/105)*s2**3 + (2/9)*s4**2 + (43/175)*s2**4 - (4/35)*s2**2*s4)
+    A0 = A0 + S2*(-(3/5)*s2 + (12/35)*s2**2 - (234/175)*s2**3 + (24/35)*s2*s4)
+    A0 = A0 + S4*((6/7)*s2**2 - (5/9)*s4)
+    A0 = A0 + S0p*(1)
+    A0 = A0 + S2p*((2/5)*s2 + (2/35)*s2**2 + (4/35)*s2*s4 - (2/25)*s2**3)
+    A0 = A0 + S4p*((4/9)*s4 + (12/35)*s2**2)
+    A0 = A0 + (m/3)*(1 - (2/5)*s2 - (9/35)*s2**2 - (4/35)*s2*s4 + (22/525)*s2**3)
+
+    return A0
 
 def B1215(s, S, m):
     # Compute the RHS of B.12-B.15 and "solve" for sn.
@@ -377,7 +394,7 @@ def Upu(ss, SS, m):
 def _test():
     N = 4096
     zvec = np.linspace(1, 1/N, N)
-    dvec = np.linspace(0,1,N)
+    dvec = -3000*zvec**2 + 3000
     mrot = 0.08
     nx = -1
     Js, out = tof4(zvec, dvec, mrot, xlevels=nx)
