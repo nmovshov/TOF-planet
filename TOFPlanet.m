@@ -470,11 +470,11 @@ classdef TOFPlanet < handle
         end
         
         function s = verify_mean_radii(obj)
-            % Sanity check: return relative errors of calculated vs. assigned si.
+            % Sanity check: relative error of calculated vs. assigned si.
             %
-            % Volume-integrate each level surfaces to check that the mean radius
-            % comes out right. If the ToF is implemented correctly they should be
-            % very close.
+            % Volume-integrate each level surfaces to check that the mean
+            % radius comes out right. If the ToF is implemented correctly they
+            % should be very close.
             
             s = nan(obj.N,1);
             for k=1:obj.N
@@ -497,7 +497,7 @@ classdef TOFPlanet < handle
                 romid = [(obj.rhoi(1:end-1) + obj.rhoi(2:end))/2; obj.rhoi(end)];
                 deltas = [romid(1); diff(romid)];
             else
-                error('Unknown moimeth %s',obj.opts.moimeth)
+                error('Unknown moimeth %s',obj.opts.moimeth) %#ok<ERTAG> 
             end
             num(obj.N) = 0;
             den = 0;
@@ -534,7 +534,7 @@ classdef TOFPlanet < handle
                     fun = @(z)interp1(x, v, z, 'pchip');
                     m = 4*pi*integral(fun, 0 , x(1));
                 otherwise
-                    error('Unknown mass calculation method.')
+                    error('Unknown mass calculation method.') %#ok<ERTAG> 
             end
         end
         
@@ -772,7 +772,7 @@ classdef TOFPlanet < handle
             elseif isequal(lower(pr.plottype), 'line')
                 lh = line(x, y/1000);
             else
-                error('Unknown value of parameter plottype.')
+                error('Unknown value of parameter plottype.') %#ok<ERTAG> 
             end
             lh.LineWidth = 2;
             if isempty(pr.axes)
@@ -850,7 +850,7 @@ classdef TOFPlanet < handle
             elseif isequal(lower(pr.plottype), 'line')
                 lh = line(x, y/1000);
             else
-                error('Unknown value of parameter plottype.')
+                error('Unknown value of parameter plottype.') %#ok<ERTAG> 
             end
             lh.LineWidth = 2;
             if isempty(pr.axes)
@@ -918,7 +918,7 @@ classdef TOFPlanet < handle
             elseif isequal(lower(pr.plottype), 'line')
                 lh = line(x, y);
             else
-                error('Unknown value of parameter plottype.')
+                error('Unknown value of parameter plottype.') %#ok<ERTAG> 
             end
             lh.LineWidth = 2;
             if isempty(pr.axes)
@@ -988,7 +988,7 @@ classdef TOFPlanet < handle
             elseif isequal(lower(pr.plottype), 'line')
                 lh = line(x, y/1e9);
             else
-                error('Unknown value of parameter plottype.')
+                error('Unknown value of parameter plottype.') %#ok<ERTAG> 
             end
             lh.LineWidth = 2;
             if isempty(pr.axes)
@@ -1383,7 +1383,7 @@ classdef TOFPlanet < handle
                 return
             end
             if ~isa(val,'barotropes.Barotrope')
-                error('eos must be a valid instance of class Barotrope')
+                error('eos must be a valid instance of class Barotrope') %#ok<ERTAG> 
             end
             obj.eos = val(:);
         end
@@ -1394,7 +1394,7 @@ classdef TOFPlanet < handle
                 return
             end
             if ~isa(val,'barotropes.Barotrope')
-                error('bgeos must be a valid instance of class Barotrope')
+                error('bgeos must be a valid instance of class Barotrope') %#ok<ERTAG> 
             end
             obj.bgeos = val;
         end
@@ -1405,7 +1405,7 @@ classdef TOFPlanet < handle
                 return
             end
             if ~isa(val,'barotropes.Barotrope')
-                error('fgeos must be a valid instance of class Barotrope')
+                error('fgeos must be a valid instance of class Barotrope') %#ok<ERTAG> 
             end
             obj.fgeos = val;
         end
@@ -1425,7 +1425,7 @@ classdef TOFPlanet < handle
                 val = length(obj.si);
             else
                 error('length(si) = %g ~= length(rhoi) = %g',...
-                    length(obj.si),length(obj.rhoi))
+                    length(obj.si),length(obj.rhoi)) %#ok<ERTAG> 
             end
         end
         
@@ -1472,7 +1472,7 @@ classdef TOFPlanet < handle
                             (h/3)*(intgrnd(k-2) + 4*intgrnd(k-1) + intgrnd(k));
                     end
                 otherwise
-                    error('Unknown pressure integral method.')
+                    error('Unknown pressure integral method.') %#ok<ERTAG> 
             end
             if nargin > 1
                 val = val(ind);
