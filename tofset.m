@@ -13,7 +13,9 @@ function options = tofset(varargin)
 %toforder - Theory of figures expansion order [ {4} 7 ]
 %dJtol - Convergence tolerance for gravity coefficients [ positive real {1e-6} ]
 %drhotol - Convergence tolerance for density adjustment [ positive real {1e-6} ]
+%drottol - Convergence tolerance for rotation adjustment [ positive real {1e-6} ]
 %MaxIterBar - Number of iterations allowed for relaxation to barotrope [ positive integer {60} ]
+%MaxIterRot - Number of iterations allowed for relaxation to rotation [ positive integer {10} ]
 %MaxIterHE - Number of iterations allowed for relaxation to equilibrium shape [ positive integer {60} ]
 %xlevels - Solve figure functions on xlevels and spline the rest [ integer scalar or vector (-1 to disable) {-1} ]
 %verbosity - Level of runtime messages [0 {1} 2 3 4]
@@ -31,7 +33,9 @@ p.FunctionName = mfilename;
 p.addParameter('toforder', 4, @(n)(n==4)||(n==7))
 p.addParameter('dJtol',1e-6,@isposscalar)
 p.addParameter('drhotol',1e-6,@isposscalar)
+p.addParameter('drottol',1e-6,@isposscalar)
 p.addParameter('MaxIterBar',60,@isposintscalar)
+p.addParameter('MaxIterRot',10,@isposintscalar)
 p.addParameter('MaxIterHE',60,@isposintscalar)
 p.addParameter('xlevels',-1,@isintscalar)
 p.addParameter('verbosity',1,@isnonnegintscalar)

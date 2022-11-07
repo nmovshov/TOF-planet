@@ -31,7 +31,7 @@ classdef TOFPlanet < handle
         name   % model name
         mass   % reference mass
         radius % reference radius (equatorial!)
-        period % refernce rotation period
+        period % reference rotation period
         P0     % reference pressure
         si     % vector of mean radii (top down, s0=si(1) is outer radius)
         rhoi   % vector of densities on si grid
@@ -75,8 +75,13 @@ classdef TOFPlanet < handle
     methods
         function obj = TOFPlanet(varargin)
             % A simple constructor of TOFPlanet objects.
-            % TOFPlanet(N, 'OPTION1', VALUE, 'OPTION2', VALUE2,...)
+            % TOFPlanet(N, OBS, 'OPTION1', VALUE, 'OPTION2', VALUE2,...)
             
+            % If first argument is observables struct use it to set references
+            if isa(varargin{1}, 'observables')
+                obj.set_observables(varargin{1});
+                varargin(1) = [];
+            end
             % Populate options struct
             obj.opts = tofset(varargin{:});
             
@@ -119,9 +124,119 @@ classdef TOFPlanet < handle
             catch
             end
         end
-        
+
+        function ET = relax_to_rotation(obj)
+            % Relax equilibrium shape and rotation period simultaneously.
+            
+            % First some checks.
+            if isempty(obj.si) || isempty(obj.rhoi)
+                warning('TOFPLANET:assertion',...
+                    'First radius and density vectors (<obj>.si,<obj>.rhoi).')
+                return
+            end
+            if numel(obj.renormalize()) < 2
+                warning('TOFPLANET:assertion',...
+                    'First set reference mass and equatorial radius.')
+                return
+            end
+            if isempty(obj.mrot)
+                warning('TOFPLANET:assertion',...
+                    'First set rotation period (<obj>.period).')
+                return
+            end
+            
+            % Optional communication
+            verb = obj.opts.verbosity;
+            if (verb > 0)
+                fprintf('Relaxing to reference rotation period...\n\n')
+            end
+            
+            % Ready, set,...
+            warning('off','TOF4:maxiter')
+            warning('off','TOF7:maxiter')
+            if obj.opts.toforder == 4
+                tofun = @tof4;
+            else
+                tofun = @tof7;
+            end
+            t_rlx = tic;
+            
+            % Main loop
+            iter = 1;
+            while (iter <= obj.opts.MaxIterRot)
+                t_pass = tic;
+                if (verb > 0)
+                    fprintf('Rotationpass %d (of max %d)...\n',...
+                        iter, obj.opts.MaxIterRot)
+                end
+                
+                old_Js = obj.Js;
+                if isempty(old_Js)
+                    old_Js = [-1, zeros(1,obj.opts.toforder)];
+                end
+                old_m = obj.mrot;
+                
+                % Call the tof algorithm
+                if isempty(obj.ss)
+                    ss_guesses = struct();
+                else
+                    ss_guesses = structfun(@flipud, obj.ss, 'UniformOutput', false);
+                end
+                [obj.Js, out] = tofun(obj.si, obj.rhoi, obj.mrot,...
+                    'tol',obj.opts.dJtol, 'maxiter',obj.opts.MaxIterHE,...
+                    'xlevels',obj.opts.xlevels, 'ss_guesses',ss_guesses);
+                obj.ss = structfun(@flipud, out.ss, 'UniformOutput', false);
+                obj.SS = structfun(@flipud, out.SS, 'UniformOutput', false);
+                obj.aos = out.a0;
+                obj.A0 = flipud(out.A0);
+                
+                % Renormalize to reference mass and radius
+                obj.renormalize();
+                
+                % Calculate changes in shape/density
+                dJs = abs((obj.Js - old_Js)./old_Js);
+                dJs = max(dJs(isfinite(dJs)));
+                drot = abs(obj.mrot - old_m);
+                
+                if (verb > 0)
+                    fprintf('Rotationpass %d (of max %d)...done. (%g sec)\n',...
+                        iter, obj.opts.MaxIterRot, toc(t_pass))
+                    fprintf('var(drot) = %g (%g required); dJ = %g (%g required).\n\n',...
+                        drot, obj.opts.drottol, dJs, obj.opts.dJtol)
+                end
+                
+                % The stopping criterion is to satisfy both J and rho tolerance
+                if (drot <= obj.opts.drottol) && dJs < obj.opts.dJtol
+                    break
+                end
+                
+                % end the main loop
+                iter = iter + 1;
+            end
+            ET = toc(t_rlx);
+            if iter > obj.opts.MaxIterRot
+                warning('TOFPLANET:maxiter','Rotation may not be fully converged.')
+            end
+            
+            % Renorm and record factors
+            % TODO: if we still need betam we must fix this
+            renorms = obj.renormalize();
+            obj.alfar = renorms(1);
+            obj.betam = renorms(2);
+            
+            % Some clean up
+            warning('on','TOF4:maxiter')
+            warning('on','TOF7:maxiter')
+            
+            % Optional communication
+            if (verb > 0)
+                fprintf('Relaxing to reference rotation...done.\n')
+                fprintf('Total elapsed time %s\n',lower(seconds2human(ET)))
+            end
+        end
+
         function ET = relax_to_barotrope(obj)
-            % Relax equilibrium shape functions, Js, and density simultaneously.
+            % Relax equilibrium shape, gravity, and density simultaneously.
             
             % First some checks.
             if isempty(obj.eos)
@@ -238,7 +353,7 @@ classdef TOFPlanet < handle
         end
         
         function [ET, dJ] = relax_to_HE(obj)
-            % Call tof<n> to obtain equilibrium shape and gravity.
+            % Call tof<n> once to obtain equilibrium shape and gravity.
             
             if (obj.opts.verbosity > 1)
                 fprintf('  Relaxing to hydrostatic equilibrium...\n')
