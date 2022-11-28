@@ -8,11 +8,11 @@ import numpy as np
 import warnings
 from scipy.interpolate import interp1d
 
-def tof4(zvec, dvec, mrot, xlevels=-1, tol=1e-6, maxiter=100, calc_moi=False):
+def tof4(zvec, dvec, mrot, **kwargs):
     """Return gravity coefficients of self-gravitating rotating fluid.
 
-    Parameters
-    ----------
+    Required parameters
+    -------------------
     zvec : ndarray, 1d, positive
         Mean radii of level surfaces where density is defined.
     dvec : ndarray, 1d, positive
@@ -20,6 +20,8 @@ def tof4(zvec, dvec, mrot, xlevels=-1, tol=1e-6, maxiter=100, calc_moi=False):
         non-increasing with z (this is *assumed*, not enforced).
     mrot : float, scalar, nonnegative
         Dimensionless rotation parameter, w^2*s0^3/GM.
+    Optional parameters
+    -------------------
     xlevels : scalar or vector, nonnegative, integer (xlevels=-1)
         Levels whose shape will be explicitly calculated. The shape functions
         will be explicitly calculated for these levels, and spline-interpolated
@@ -38,6 +40,10 @@ def tof4(zvec, dvec, mrot, xlevels=-1, tol=1e-6, maxiter=100, calc_moi=False):
     calc_moi : bool, scalar (default False)
         Flag to calculate and return the normalized moment of inertia in output
         struct; off by default since it takes an extra half second or so.
+    ss_guesses : list of length svec.size arrays (default 5*[np.zeros(N)])
+        Initial guess for shape functions. This is not all that helpful in
+        speeding up convergence. It's occasionally helpful to preserve state
+        between successive calls.
 
     Outputs
     -------
@@ -64,6 +70,9 @@ def tof4(zvec, dvec, mrot, xlevels=-1, tol=1e-6, maxiter=100, calc_moi=False):
     assert zvec.shape == dvec.shape
     assert mrot >= 0
 
+    # Spread default and passed **kwargs
+    opts = {**default_opts(), **kwargs}
+
     # Normalize radii and densities (it's safe to normalize a normal)
     dro = np.hstack((dvec[-1], np.diff(np.flipud(dvec))))
     m = sum(dro*np.flipud(zvec)**3)
@@ -73,16 +82,19 @@ def tof4(zvec, dvec, mrot, xlevels=-1, tol=1e-6, maxiter=100, calc_moi=False):
 
     # Define and initialize local variables
     N = len(zvec)
-    ss = 5*[np.zeros(N)]
-    if np.isscalar(xlevels):
-        sskip = int(max(np.fix(N/xlevels), 1))
+    if opts['ss_guesses'] is None:
+        ss = 5*[np.zeros(N)]
+    else:
+        ss = opts['ss_guesses']
+    if np.isscalar(opts['xlevels']):
+        sskip = int(max(np.fix(N/opts['xlevels']), 1))
         xind = range(0, N, sskip)
     else:
         raise(Exception("Vector xlevels feature not yet implemented"))
 
     # The loop, following Nettelmann (2017) Appendix B
     Js = np.array([0, 0, 0, 0, 0]) # J0=0 ensures at least one iteration
-    for iter in range(maxiter):
+    for it in range(opts['maxiter']):
         # Equations B.16-B.17
         fs = B1617(ss)
 
@@ -97,12 +109,11 @@ def tof4(zvec, dvec, mrot, xlevels=-1, tol=1e-6, maxiter=100, calc_moi=False):
 
         # Check for convergence to terminate
         dJs = np.abs(Js - new_Js)/np.abs(Js + np.spacing(1))
-        if np.all(dJs < tol):
+        if np.all(dJs < opts['tol']):
             break
-        elif iter < maxiter:
-            Js = new_Js
+        Js = new_Js
 
-    if iter == (maxiter - 1):
+    if (it == (opts['maxiter'] - 1)) and (opts['verbosity'] > 0):
         warnings.warn('Figure functions may not be fully converged.')
 
     # Return
@@ -110,13 +121,13 @@ def tof4(zvec, dvec, mrot, xlevels=-1, tol=1e-6, maxiter=100, calc_moi=False):
     class out:
         pass
     out.dJs = dJs
-    out.iter = iter
+    out.it = it
     out.a0 = a0
     out.qrot = mrot*a0**3
     out.ss = ss
     out.SS = SS
     out.A0 = B4(ss,SS,mrot)
-    if calc_moi:
+    if opts['calc_moi']:
         out.NMoI = NMoI(zvec, dvec, ss, a0)
     else:
         out.NMoI = None
@@ -124,6 +135,17 @@ def tof4(zvec, dvec, mrot, xlevels=-1, tol=1e-6, maxiter=100, calc_moi=False):
 
 
 ### Helper functions
+def default_opts():
+    """Return dict of default values for tof4's **kwargs."""
+    opts = {}
+    opts['xlevels'] = -1
+    opts['tol'] = 1e-6
+    opts['maxiter'] = 100
+    opts['calc_moi'] = False
+    opts['ss_guesses'] = None
+    opts['verbosity'] = 1
+    return opts
+
 def NMoI(zi, rhoi, ss, a0):
     # Fast moment of inertia calculation (normalized by a0)
     rhoi = np.hstack((rhoi[0], (rhoi[:-1] + rhoi[1:])/2))
@@ -392,23 +414,27 @@ def Upu(ss, SS, m):
     return -A0
 
 def _test():
-    N = 4096
+    from timeit import default_timer as timer
+    N = 1024
     zvec = np.linspace(1, 1/N, N)
     dvec = -3000*zvec**2 + 3000
     mrot = 0.08
-    nx = -1
+    nx = 128
+    tic = timer()
     Js, out = tof4(zvec, dvec, mrot, xlevels=nx)
-    print("After {} iterations:".format(out.iter+1))
-    print("J0 = {}".format(Js[0]))
-    print("J2 = {}".format(Js[1]))
-    print("J4 = {}".format(Js[2]))
-    print("J6 = {}".format(Js[3]))
-    print("J8 = {}".format(Js[4]))
-    print("a0 = {}".format(out.a0))
-    print("q = {}".format(out.qrot))
-    print("I = {}".format(out.NMoI))
+    toc = timer()
+    print(f"With N = {N} and nx = {nx}.")
+    print(f"Elapsed time {toc - tic:0.2} seconds.")
+    print(f"After {out.it+1} iterations:")
+    print(f"J0 = {Js[0]}")
+    print(f"J2 = {Js[1]}")
+    print(f"J4 = {Js[2]}")
+    print(f"J6 = {Js[3]}")
+    print(f"J8 = {Js[4]}")
+    print(f"a0 = {out.a0}")
+    print(f"q = {out.qrot}")
+    print(f"I = {out.NMoI}")
     print("")
 
 if __name__ == '__main__':
     _test()
-    sys.exit(0)

@@ -43,7 +43,11 @@ class TOFPlanet:
         if obs is None:
             obs = _default_planet()
         self.set_observables(obs)
-        self.Js = np.hstack((-1, np.zeros(self.opts['toforder'])))
+        self.M = None
+        self.NMoI = None
+        self.Pi = None
+        self.ss = None
+        self.SS = None
 
     def set_observables(self,obs):
         """Copy physical properties from an observables struct."""
@@ -62,6 +66,9 @@ class TOFPlanet:
     def relax_to_rotation(self):
         """Call relax_to_He repeatedly for simultaneous shape and rotation."""
 
+        self.Js = np.hstack((-1, np.zeros(self.opts['toforder'])))
+        self.opts['MaxIterHE'] = 3 # optimal from token benchmark
+        self.opts['verbosity'] = 0 # silence HE warnings
         it = 1
         while it < self.opts['MaxIterRot']:
             it = it + 1
@@ -93,7 +100,9 @@ class TOFPlanet:
 
         self.Js, out = tofun(self.si, self.rhoi, self.mrot,
             tol=self.opts['dJtol'], maxiter=self.opts['MaxIterHE'],
-            xlevels=self.opts['xlevels'], calc_moi=moi)
+            xlevels=self.opts['xlevels'], verbosity=self.opts['verbosity'],
+            ss_guesses=self.ss,
+            calc_moi=moi)
         toc = timer() - tic
 
         if (self.opts['verbosity'] > 1):
@@ -102,6 +111,8 @@ class TOFPlanet:
 
         self.NMoI = out.NMoI
         self.A0 = np.flip(out.A0)
+        self.ss = out.ss # consider flipping used other than ss_guesses
+        self.SS = out.SS # consider flipping if used anywhere
         self.aos = out.a0
 
         if fixradius:
@@ -233,7 +244,7 @@ def _default_opts(kwargs):
             'dJtol':1e-6,
             'drottol':1e-6,
             'MaxIterHE':60,
-            'MaxIterRot':10,
+            'MaxIterRot':20,
             'xlevels':-1,
             'verbosity':1
             }
@@ -251,22 +262,29 @@ class _default_planet:
     P0 = 1e5
     P = 0.41354*24*3600
 
-def _test():
+def _test(N,nx,torder):
     obs = _default_planet()
-    tp = TOFPlanet(obs,xlevels=256)
-    N = 4096
-    tp.si = np.linspace(1, 1/N, N)
-    a = - 15*obs.M/8/np.pi/obs.s0**3
-    tp.rhoi = a*tp.si**2 - a
-    tp.relax_to_HE(moi=True, pressure=True)
+    tp = TOFPlanet(obs,xlevels=nx)
+    zvec = np.linspace(1, 1/N, N)
+    dvec = -3000*zvec**2 + 3000
+    tp.si = zvec*tp.s0
+    tp.rhoi = dvec
+    #a = - 15*obs.M/8/np.pi/obs.s0**3
+    tp.opts['toforder'] = torder
+    tic = timer()
+    it = tp.relax_to_rotation()
+    toc = timer()
+    print()
+    print(f"{N=}, {nx=}")
+    print(f"{it} iterations of tof{torder} in {toc-tic:.3g} sec.")
     print("J0 = {}".format(tp.Js[0]))
     print("J2 = {}".format(tp.Js[1]))
     print("J4 = {}".format(tp.Js[2]))
     print("J6 = {}".format(tp.Js[3]))
     print("J8 = {}".format(tp.Js[4]))
     print("I = {}".format(tp.NMoI))
-    print("P_center = {}".format(tp.Pi[-1]))
     print("")
 
 if __name__ == '__main__':
-    _test()
+    _test(4096,-1,4)
+#    _test(4096,-1,7)
