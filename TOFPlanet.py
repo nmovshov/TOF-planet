@@ -141,6 +141,10 @@ class TOFPlanet:
                 P[k+1] = P[k] + 0.5*(r[k] - r[k+1])*(intgrnd[k] + intgrnd[k+1])
             self.Pi = P
 
+    ### Private methods slash pseudo properties
+    def _m2P(self):
+        return 2*np.pi/(np.sqrt(self.mrot*(self.G*self.M)/self.s0**3))
+
     ### Visualizers
     def plot_rho_of_r(self):
         import matplotlib.pyplot as plt
