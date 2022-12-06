@@ -145,6 +145,9 @@ class TOFPlanet:
     def _m2P(self):
         return 2*np.pi/(np.sqrt(self.mrot*(self.G*self.M)/self.s0**3))
 
+    def _P2m(self):
+        return (2*np.pi/self.period)**2*self.s0**3/(self.G*self.M)
+
     ### Visualizers
     def plot_rho_of_r(self):
         import matplotlib.pyplot as plt
