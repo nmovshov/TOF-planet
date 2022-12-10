@@ -58,9 +58,6 @@ class TOFPlanet:
         self.P0 = obs.P0
         self.period = obs.P
         self.GM = self.G*self.mass
-        self.wrot = 2*np.pi/self.period
-        self.qrot = self.wrot**2*self.radius**3/self.GM
-        self.mrot = self.wrot**2*self.s0**3/self.GM
         self.rhobar = self.mass/(4*np.pi/3*self.s0**3)
 
     def relax_to_rotation(self):
@@ -69,6 +66,9 @@ class TOFPlanet:
         self.Js = np.hstack((-1, np.zeros(self.opts['toforder'])))
         self.opts['MaxIterHE'] = 3 # optimal from token benchmark
         self.opts['verbosity'] = 0 # silence HE warnings
+
+        self.wrot = 2*np.pi/self.period
+        self.mrot = self.wrot**2*self.s0**3/self.GM
         it = 1
         while it < self.opts['MaxIterRot']:
             it = it + 1
@@ -221,8 +221,6 @@ class TOFPlanet:
             fid.write(f'# Mean radius       s0 = {self.s0:0.6e} m\n')
             fid.write(f'# Equatorial radius a0 = {self.a0:0.6e} m\n')
             fid.write(f'# Rotation period P = {self.period:0.6g} s\n')
-            fid.write(f'# Rotation parameter m = {self.mrot:0.6f}\n')
-            fid.write(f'# Rotation parameter q = {self.qrot:0.6f}\n')
             fid.write(f'# Normalized MOI = {self.NMoI:0.6f}\n')
             fid.write(f'#\n')
             fid.write(f'# Calculated gravity zonal harmonics (x 10^6):\n')
