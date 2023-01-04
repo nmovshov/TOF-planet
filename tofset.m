@@ -18,7 +18,7 @@ function options = tofset(varargin)
 %MaxIterRot - Number of iterations allowed for relaxation to rotation [ positive integer {10} ]
 %MaxIterHE - Number of iterations allowed for relaxation to equilibrium shape [ positive integer {60} ]
 %xlevels - Solve figure functions on xlevels and spline the rest [ integer scalar or vector (-1 to disable) {-1} ]
-%verbosity - Level of runtime messages [0 {1} 2 3 4]
+%verbosity - Level of runtime messages [{0} 1 2 3 4]
 
 % If no arguments print usage and return.
 if (nargin == 0) && (nargout == 0)
@@ -38,7 +38,7 @@ p.addParameter('MaxIterBar',60,@isposintscalar)
 p.addParameter('MaxIterRot',10,@isposintscalar)
 p.addParameter('MaxIterHE',60,@isposintscalar)
 p.addParameter('xlevels',-1,@isintscalar)
-p.addParameter('verbosity',1,@isnonnegintscalar)
+p.addParameter('verbosity',0,@isnonnegintscalar)
 
 % undocumented or obsolete options
 p.addParameter('masmeth','trapz'); % undocumented mass integral method

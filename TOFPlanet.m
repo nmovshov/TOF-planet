@@ -1,20 +1,32 @@
 classdef TOFPlanet < handle
     %TOFPLANET Interior model of rotating fluid planet.
-    %   This class implements a model of a rotating fluid planet using Theory of
-    %   Figures to calculate the hydrostatic equilibrium shape and resulting
-    %   gravity field. A TOFPlanet object is defined by a densiy profile rho(s),
-    %   supplied by the user and stored in the column vectors obj.si and
-    %   obj.rhoi, indexed from the surface in. To complete the definition the
-    %   user must also specify a mass, equatorial radius, and rotation period.
-    %   With these a gravity field and equilibrium shape can be determined,
-    %   with a call to obj.relax_to_HE(). Note, however, that the oblate shape
-    %   calculated with relax_to_HE() preserves the mass and mean radius of the
-    %   planet, but not the equatorial radius. A call to fix_radius()
-    %   renormalizs the si vector to match the reference equatorial radius, at
-    %   the cost of modifying the implied mass. A call to renormalize()
-    %   modifies both si and rhoi to preserve the reference mass and equatorial
-    %   radius, at the cost of modifying the assigned density. It is not
+    %
+    %   This class implements a model of a rotating fluid planet using Theory
+    %   of Figures to calculate the hydrostatic equilibrium shape and resulting
+    %   gravity field. A TOFPlanet object is defined by a densiy profile
+    %   rho(s), supplied by the user and stored in the column vectors obj.si
+    %   and obj.rhoi, indexed from the surface in. To complete the definition
+    %   the user must also specify a mass, equatorial radius, and rotation
+    %   period. With these a gravity field and equilibrium shape can be
+    %   determined, with a call to obj.relax_to_HE().
+    %
+    %   Note that the oblate shape calculated with relax_to_HE() preserves the
+    %   mass of the planet but not the equatorial radius. If fixradius is true
+    %   (default: true) the si will be re-normalized to match the reference
+    %   equatorial radius, modifying the implied mass. If fixmass is true
+    %   (default: true) the density is then re-normalized to match the
+    %   reference mass, modifying the reference 1-bar density. It is not
     %   possible to define mass, radius, and density simultaneously.
+    %
+    %   A call to relax_to_HE() with fixradius true and/or fixmass false
+    %   modifies the implied rotation period, given a fixed rotation parameter
+    %   m. To preserve the reference mass, radius, and rotation period, it is
+    %   necessary to run the equilibrium shape calculation iteratively,
+    %   recalculating the rotation parameter between iterations. This is done
+    %   with a call to relax_to_rotation(). Normally, a call to
+    %   relax_to_rotation() with default flags is the recommended (but slow)
+    %   way to obtain a self-consistent model planet suitable for direct
+    %   comparison with observation and/or third-party models.
     %
     %   Alternatively the user may supply a barotrope object, stored in
     %   obj.eos, and call obj.relax_to_barotrope() to iteratively find a
@@ -55,6 +67,7 @@ classdef TOFPlanet < handle
         mi     % cumulative mass below si
         ai     % equatorial radii on level surfaces
         s0     % surface mean radius (another name for obj.si(1))
+        rho0   % 1-bar density (another name for obj.rhoi(1))
         rhobar % calculated mean density
         wrot   % rotation frequency, 2pi/period
         qrot   % rotation parameter wrot^2a0^3/GM
@@ -69,79 +82,63 @@ classdef TOFPlanet < handle
     properties (GetAccess = private)
         aos    % calculated equatorial to mean radius ratio (from tof<n>.m)
         G      % Gravitational constant
+        GM     % Gravitational parameter
     end
     
     %% A simple constructor
     methods
-        function obj = TOFPlanet(varargin)
+        function obj = TOFPlanet(obs,varargin)
             % A simple constructor of TOFPlanet objects.
-            % TOFPlanet(N, OBS, 'OPTION1', VALUE, 'OPTION2', VALUE2,...)
+            % TOFPlanet(OBS, 'OPTION1', VALUE, 'OPTION2', VALUE2,...)
             
-            % If first argument is observables struct use it to set references
-            if isa(varargin{1}, 'observables')
-                obj.set_observables(varargin{1});
-                varargin(1) = [];
+            % Set reference values from obs (or undocumented default planet)
+            if nargin == 0 % prefill critical fields with reasonable values
+                obs.pname = 'planet';
+                obs.M  = 1898.187e24;
+                obs.a0 = 71492e3;
+                obs.s0 = 69911e3;
+                obs.P0 = 1e5;
+                obs.P = 0.41354*24*3600;
             end
+            obj.set_observables(obs);
             % Populate options struct
             obj.opts = tofset(varargin{:});
             
             % Init privates
             obj.aos = 1;
             obj.G = 6.67430e-11; % m^3 kg^-1 s^-2 (2018 NIST reference)
+            obj.GM = obj.G*obj.mass;
         end
     end % End of constructor block
     
     %% Public methods
     methods (Access = public)
-        function obj = set_ss_guesses(obj, ss_guesses)
-            % Supply a shape functions struct to seed relax_to_HE call.
-            
-            if nargin < 2, ss_guesses = []; end
-            if isempty(ss_guesses), obj.ss = []; return; end
-            validateattributes(ss_guesses,{'struct'},{'scalar'},'','ss_guesses',1)
-            try
-                x = ss_guesses;
-                validateattributes(x.s0,{'numeric'},{'column','numel',obj.N},'','s0')
-                validateattributes(x.s2,{'numeric'},{'column','numel',obj.N},'','s2')
-                validateattributes(x.s4,{'numeric'},{'column','numel',obj.N},'','s4')
-                validateattributes(x.s6,{'numeric'},{'column','numel',obj.N},'','s6')
-                validateattributes(x.s8,{'numeric'},{'column','numel',obj.N},'','s8')
-                obj.ss = ss_guesses;
-            catch ME
-                warning(ME.identifier,'ss_guesses not set because:\n%s',ME.message)
-            end
-        end
-        
         function obj = set_observables(obj, obs)
             % Copy physical properties from an +observables struct.
+            obj.name = obs.pname;
             obj.mass = obs.M;
             obj.radius = obs.a0;
             obj.period = obs.P;
             obj.P0 = obs.P0;
-            try
-                obj.bgeos = obs.bgeos;
-                obj.fgeos = obs.fgeos;
-            catch
-            end
         end
 
-        function ET = relax_to_rotation(obj)
+        function iter = relax_to_rotation(obj)
             % Relax equilibrium shape and rotation period simultaneously.
             
             % First some checks.
             if isempty(obj.si) || isempty(obj.rhoi)
                 warning('TOFPLANET:assertion',...
-                    'First radius and density vectors (<obj>.si,<obj>.rhoi).')
+                    'Set radius and density vectors (<obj>.si,<obj>.rhoi).')
                 return
             end
             if numel(obj.renormalize()) < 2
                 warning('TOFPLANET:assertion',...
-                    'First set reference mass and equatorial radius.')
+                    'Set reference mass and equatorial radius.')
                 return
             end
             if isempty(obj.mrot)
                 warning('TOFPLANET:assertion',...
-                    'First set rotation period (<obj>.period).')
+                    'Set rotation period (<obj>.period).')
                 return
             end
             
@@ -154,6 +151,7 @@ classdef TOFPlanet < handle
             % Ready, set,...
             warning('off','TOF4:maxiter')
             warning('off','TOF7:maxiter')
+            obj.opts.MaxIterHE = 3; % optimal from token benchmark
             if obj.opts.toforder == 4
                 tofun = @tof4;
             else
@@ -193,7 +191,7 @@ classdef TOFPlanet < handle
                 % Renormalize to reference mass and radius
                 obj.renormalize();
                 
-                % Calculate changes in shape/density
+                % Calculate changes in shape/rotation
                 dJs = abs((obj.Js - old_Js)./old_Js);
                 dJs = max(dJs(isfinite(dJs)));
                 drot = abs(obj.mrot - old_m);
@@ -802,6 +800,51 @@ classdef TOFPlanet < handle
             gh = legend(ah, 'show','location','ne');
             gh.FontSize = 11;
         end
+
+        function lh = plot_rho_of_P(obj, ax)
+            if isempty(obj.rhobar)
+                warning('Uninitialized object.')
+                return
+            end
+            
+            % Input parsing
+            if nargin < 2, ax = []; end
+            
+            % Prepare the canvas
+            if isempty(ax)
+                fh = figure;
+                set(fh, 'defaultTextInterpreter', 'latex')
+                set(fh, 'defaultLegendInterpreter', 'latex')
+                ah = axes;
+            else
+                ah = ax;
+            end
+            hold(ah, 'on')
+            
+            % Prepare the data
+            x = double(obj.Pi)/1e9;
+            y = double(obj.rhoi)/1000;
+            
+            % Plot the lines (density in 1000 kg/m^3)
+            lh = plot(x,y);
+            lh.LineWidth = 2;
+            lh.DisplayName = obj.name;
+            
+            % Style and annotate axes
+            if isempty(ax)
+                ah.Box = 'on';
+                ah.XScale = 'log';
+                ah.YScale = 'log';
+                xlabel('Pressure, $P$ [GPa]', 'fontsize', 12)
+                ylabel('$\rho$ [1000 kg/m$^3$]', 'fontsize', 12)
+                ah.XLim(1) = 1e-3;
+            end
+            
+            % Legend
+            legend(ah, 'off')
+            gh = legend(ah, 'show','location','ne');
+            gh.FontSize = 11;
+        end
         
         function [ah, lh, gh] = plot_residual_rho_of_r(obj, varargin)
             % Plot rho(r)-rho_xy(r) using a background eos.
@@ -1150,16 +1193,8 @@ classdef TOFPlanet < handle
             s.rhobar = obj.rhobar;
             s.mrot   = obj.mrot;
             s.qrot   = obj.qrot;
-            s.J2     = obj.J2;
-            s.J4     = obj.J4;
-            s.J6     = obj.J6;
-            s.J8     = obj.J8;
-            if obj.opts.toforder == 7
-                s.J10 = obj.Js(6);
-                s.J12 = obj.Js(7);
-                s.J14 = obj.Js(8);
-            end
             s.NMoI   = obj.NMoI;
+            s.Js     = obj.Js;
             s.si     = obj.si;
             s.ai     = obj.ai;
             s.rhoi   = obj.rhoi;
@@ -1181,23 +1216,11 @@ classdef TOFPlanet < handle
                 s.Pi     = [];
                 s.mi     = [];
             end
-            
             try
                 s.eos = obj.eos.name;
             catch
                 s.eos = '';
             end
-            try
-                s.bgeos = obj.bgeos.name;
-            catch
-                s.bgeos = '';
-            end
-            try
-                s.fgeos = obj.fgeos.name;
-            catch
-                s.fgeos = '';
-            end
-            
             if keepss
                 s.ss = obj.ss;
             else
@@ -1280,6 +1303,25 @@ classdef TOFPlanet < handle
     
     %% Private (or obsolete) methods
     methods (Access = private)
+        function obj = set_ss_guesses(obj, ss_guesses)
+            % Supply a shape functions struct to seed relax_to_HE call.
+            
+            if nargin < 2, ss_guesses = []; end
+            if isempty(ss_guesses), obj.ss = []; return; end
+            validateattributes(ss_guesses,{'struct'},{'scalar'},'','ss_guesses',1)
+            try
+                x = ss_guesses;
+                validateattributes(x.s0,{'numeric'},{'column','numel',obj.N},'','s0')
+                validateattributes(x.s2,{'numeric'},{'column','numel',obj.N},'','s2')
+                validateattributes(x.s4,{'numeric'},{'column','numel',obj.N},'','s4')
+                validateattributes(x.s6,{'numeric'},{'column','numel',obj.N},'','s6')
+                validateattributes(x.s8,{'numeric'},{'column','numel',obj.N},'','s8')
+                obj.ss = ss_guesses;
+            catch ME
+                warning(ME.identifier,'ss_guesses not set because:\n%s',ME.message)
+            end
+        end
+
         function val = Ki(obj)
             P = obj.Pi;
             ro = obj.rhoi;
@@ -1417,6 +1459,14 @@ classdef TOFPlanet < handle
                 val = obj.si(1);
             end
         end
+
+        function val = get.rho0(obj)
+            if isempty(obj.rhoi)
+                val = [];
+            else
+                val = obj.rhoi(1);
+            end
+        end
         
         function val = get.N(obj)
             if isempty(obj.si) || isempty(obj.rhoi)
@@ -1515,13 +1565,11 @@ classdef TOFPlanet < handle
         end
         
         function val = get.qrot(obj)
-            GM = obj.G*obj.mass;
-            val = obj.wrot^2.*obj.radius^3./GM;
+            val = obj.wrot^2.*obj.radius^3./obj.GM;
         end
         
         function val = get.mrot(obj)
-            GM = obj.G*obj.mass;
-            val = obj.wrot^2.*obj.s0^3./GM;
+            val = obj.wrot^2.*obj.s0^3./obj.GM;
         end
         
         function set.mrot(~,~)
