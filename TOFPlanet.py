@@ -70,7 +70,7 @@ class TOFPlanet:
         self.wrot = 2*np.pi/self.period
         self.mrot = self.wrot**2*self.s0**3/self.GM
         it = 1
-        while it < self.opts['MaxIterRot']:
+        while (it < self.opts['MaxIterRot']) and (self.mrot > 0):
             it = it + 1
             old_Js = self.Js
             old_m = self.mrot
