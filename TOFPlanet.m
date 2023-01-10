@@ -161,7 +161,7 @@ classdef TOFPlanet < handle
             
             % Main loop
             iter = 1;
-            while (iter <= obj.opts.MaxIterRot)
+            while (iter <= obj.opts.MaxIterRot) && (obj.mrot > 0)
                 t_pass = tic;
                 if (verb > 0)
                     fprintf('Rotationpass %d (of max %d)...\n',...
