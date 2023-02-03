@@ -1191,6 +1191,7 @@ classdef TOFPlanet < handle
             s.s0     = obj.s0;
             s.a0     = obj.a0;
             s.rhobar = obj.rhobar;
+            s.period = obj.period;
             s.mrot   = obj.mrot;
             s.qrot   = obj.qrot;
             s.NMoI   = obj.NMoI;
