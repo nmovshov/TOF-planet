@@ -60,7 +60,7 @@ class TOFPlanet:
         self.GM = self.G*self.mass
         self.rhobar = self.mass/(4*np.pi/3*self.s0**3)
 
-    def relax_to_rotation(self):
+    def relax_to_rotation(self, fixmass=True):
         """Call relax_to_He repeatedly for simultaneous shape and rotation."""
 
         self.Js = np.hstack((-1, np.zeros(self.opts['toforder'])))
@@ -74,7 +74,7 @@ class TOFPlanet:
             it = it + 1
             old_Js = self.Js
             old_m = self.mrot
-            self.relax_to_HE(fixradius=True,fixmass=True,fixrot=True)
+            self.relax_to_HE(fixradius=True,fixmass=fixmass,fixrot=True)
             dJs = np.abs((self.Js - old_Js)/self.Js)
             dJs = np.max(dJs[np.isfinite(dJs)])
             drot = np.abs(old_m - self.mrot)
