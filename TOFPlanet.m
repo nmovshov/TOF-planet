@@ -87,9 +87,9 @@ classdef TOFPlanet < handle
     
     %% A simple constructor
     methods
-        function obj = TOFPlanet(obs,varargin)
+        function obj = TOFPlanet(varargin)
             % A simple constructor of TOFPlanet objects.
-            % TOFPlanet(OBS, 'OPTION1', VALUE, 'OPTION2', VALUE2,...)
+            % TOFPlanet(OBS,'OPTION1', VALUE, 'OPTION2', VALUE2,...)
             
             % Set reference values from obs (or undocumented default planet)
             if nargin == 0 % prefill critical fields with reasonable values
@@ -99,8 +99,12 @@ classdef TOFPlanet < handle
                 obs.s0 = 69911e3;
                 obs.P0 = 1e5;
                 obs.P = 0.41354*24*3600;
+                obj.set_observables(obs);
+            elseif mod(nargin,2)
+                obs = varargin{1};
+                obj.set_observables(obs);
+                varargin(1) = [];
             end
-            obj.set_observables(obs);
             % Populate options struct
             obj.opts = tofset(varargin{:});
             
