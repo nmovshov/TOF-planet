@@ -41,9 +41,11 @@ eos = barotropes.Polytrope(K, n);
 eos.name = '$P\propto\rho^2$';
 
 %% Set up TOFPlanet(s)
-N = 4096;
+N = 2^15; % around N=2^18 ToF7 gets more precise J2 than ToF4
+nx = 128;
 
 tofour = TOFPlanet('toforder',4);
+tofour.opts.verbosity = 1;
 tofour.name = [int2str(N),'-point TOF4'];
 tofour.G = G; % undocumented TOFPlanet property
 tofour.mass = M;
@@ -55,6 +57,7 @@ tofour.P0 = 0; % added to surface pressure
 tofour.eos = eos;
 
 tofsev = TOFPlanet('toforder',7);
+tofsev.opts.verbosity = 1;
 tofsev.name = [int2str(N),'-point TOF7'];
 tofsev.G = G; % undocumented TOFPlanet property
 tofsev.mass = M;
@@ -66,12 +69,14 @@ tofsev.P0 = 0; % added to surface pressure
 tofsev.eos = eos;
 
 %% Relax to desired barotrope (fast for tof4, slow for tof7)
+tofour.opts.xlevels = nx;
 tofour.opts.drhotol = 1e-6;
 tofour.opts.dJtol = 1e-10;
 tofour.opts.MaxIterBar = 60;
 tofour.opts.MaxIterHE = 60;
 tofour.relax_to_barotrope();
 
+tofsev.opts.xlevels = nx;
 tofsev.opts.drhotol = 1e-6;
 tofsev.opts.dJtol = 1e-10;
 tofsev.opts.MaxIterBar = 60;
@@ -83,6 +88,7 @@ tofsev.relax_to_barotrope();
 % With TOFPlanet
 MTOF4 = [tofour.a0/tofour.s0, tofour.Js(2:end), nan, nan, nan];
 MTOF7 = [tofsev.a0/tofsev.s0, tofsev.Js(2:end)];
+
 % Wisdom and Hubbard (2016) Table 3
 CLC = [1.022875431133185, 1.398851089834637e-2, -5.318281001092471e-4,...
                           3.011832290533577e-5, -2.132115710726158e-6,...
@@ -103,15 +109,16 @@ ZT3 = [nan, (0.173273*q - 0.197027*q^2 + 0.15*q^3),...
             (-0.081092*q^2 + 0.15*q^3),...
             (0.056329*q^3), nan, nan, nan, nan];
 
+% Now the table of comparisons, using absolute diff from WH16-3
 cols = {'Re/R', 'J2', 'J4', 'J6', 'J8', 'J10', 'J12', 'J14'};
 rows = {'CLC', 'TOF4', 'TOF7', 'CMS_WH16', 'CMS_H13', 'ZT78'};
 A = [CLC; MTOF4; MTOF7; CMS512; H13; ZT3];
-E = (A(2:end,:) - A(1,:))./A(1,:);
+E = abs(A(2:end,:) - A(1,:));
 T_vals = array2table(A, 'VariableNames', cols, 'RowNames', rows);
-T_errs = array2table(E, 'VariableNames', cols, 'RowNames', rows(2:end));
+WH16_diffs = array2table(E, 'VariableNames', cols, 'RowNames', rows(2:end));
 
 %% Output
 format shorte
 %display(T_vals)
-display(T_errs(:,1:3))
+display(WH16_diffs(:,1:4))
 format

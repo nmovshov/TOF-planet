@@ -37,7 +37,7 @@ M = 317.8*5.9722e+24;
 R = 71492e3;
 
 %#ok<*SAGROW>
-N = [128,256,512];
+N = 2.^(12:16);
 for k=1:length(N)
     tof(k) = TOFPlanet();
     tof(k).name = ['TOF',int2str(N(k))];
@@ -62,19 +62,14 @@ eos.name = sprintf('$P\\propto\\rho^2$');
 
 %% Relax to desired barotrope
 for k=1:length(N)
-    tof(k).opts.verbosity = 1;
-    tof(k).opts.dJtol = 1e-6;
+    tof(k).opts.verbosity = 0;
+    tof(k).opts.dJtol = 1e-10;
     tof(k).opts.drhotol = 1e-6;
     tof(k).opts.MaxIterBar = 20; % default 40
     tof(k).relax_to_barotrope();
 end
 
 %% Compare computed and analytic density structure
-% prepare
-set(groot, 'defaultTextInterpreter', 'latex')
-set(groot, 'defaultLegendInterpreter', 'latex')
-set(groot, 'defaultAxesBox', 'on')
-
 % calculate
 a = sqrt(2*pi*G/K);
 R = pi/a;
@@ -83,6 +78,18 @@ rho_c = (pi^2/3)*rho_av;
 r = linspace(0,1)*R;
 rho_exact = rho_c*sin(a*r)./(a*r);
 rho_exact(1) = rho_c;
+
+for k=1:length(N)
+    %P_center = interp1(tof(n).si, tof(n).Pi, 0, 'pchip');
+    pc_err(k) = (tof(k).Pi(end) - tof(k).eos.pressure(rho_c))/tof(k).eos.pressure(rho_c);
+end
+PC_ERR_T = table(N', pc_err', VariableNames={'N', 'P_c error'});
+display(PC_ERR_T)
+
+% prepare
+set(groot, 'defaultTextInterpreter', 'latex')
+set(groot, 'defaultLegendInterpreter', 'latex')
+set(groot, 'defaultAxesBox', 'on')
 
 % plot
 ah = axes; hold(ah, 'on');

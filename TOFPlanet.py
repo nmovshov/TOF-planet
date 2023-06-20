@@ -13,11 +13,11 @@ class TOFPlanet:
     This class implements a model of a rotating fluid planet using Theory of
     Figures to calculate the hydrostatic equilibrium shape and resulting
     gravity field. A TOFPlanet object is defined by a density profile rho(s),
-    supplied by the user and stored in the column vectors obj.si and obj.rhoi,
+    supplied by the user and stored in the column vectors si and rhoi,
     indexed from the surface in. To complete the definition the user must also
     specify a mass, equatorial radius, and rotation period. With these a
     gravity field and equilibrium shape can be determined, with a call to
-    obj.relax_to_HE().
+    relax_to_HE().
 
     Note that the oblate shape calculated with relax_to_HE() preserves the mass
     of the planet but not the equatorial radius. If fixradius is True (default:
@@ -33,9 +33,17 @@ class TOFPlanet:
     to run the equilibrium shape calculation iteratively, recalculating the
     rotation parameter between iterations. This is done with a call to
     relax_to_rotation(). Normally, a call to relax_to_rotation() with default
-    flags is the recommended (but slow) way to obtain a self-consistent model
-    planet suitable for direct comparison with observation and/or third-party
-    models.
+    flags is the recommended way to obtain a self-consistent model planet
+    suitable for direct comparison with observation and/or third-party models.
+
+    Alternatively the user may supply a barotrope, rho(P,r) function and call
+    relax_to_barotrope() to iteratively find a density profile consistent with
+    the calculated equilibrium pressure. To this end a boundary pressure must
+    also be given and an initial density profile guess is still required (can
+    be a simple one). Again, we can't simultaneously impose an exact mass,
+    radius, and barotrope. By default the reference mass and radius will be
+    honored, by re-normalizing the converged density profile, and this will
+    modify the _effective_ barotrope.
     """
     def __init__(self, obs=None, **kwargs):
         self.G = 6.67430e-11 # m^3 kg^-1 s^-2 (2018 NIST reference)
@@ -60,6 +68,10 @@ class TOFPlanet:
         self.GM = self.G*self.mass
         self.rhobar = self.mass/(4*np.pi/3*self.s0**3)
 
+    def set_barotrope(self, fun):
+        """Store a function with signature density = f(pressure, radius)."""
+        self.baro = fun
+
     def relax_to_rotation(self, fixmass=True):
         """Call relax_to_He repeatedly for simultaneous shape and rotation."""
 
@@ -75,13 +87,42 @@ class TOFPlanet:
             old_Js = self.Js
             old_m = self.mrot
             self.relax_to_HE(fixradius=True,fixmass=fixmass,fixrot=True)
-            dJs = np.abs((self.Js - old_Js)/self.Js)
-            dJs = np.max(dJs[np.isfinite(dJs)])
+            dJs = np.abs((self.Js[1] - old_Js[1]))
             drot = np.abs(old_m - self.mrot)
             if (drot < self.opts['drottol']) and (dJs < self.opts['dJtol']):
                 break
         if it == self.opts['MaxIterRot']:
             warnings.warn('Rotation period may not be fully converged.')
+        return it
+
+    def relax_to_barotrope(self, fixmass=True):
+        """Call relax_to_He repeatedly to converge shape/rotation/density."""
+
+        self.Js = np.hstack((-1, np.zeros(self.opts['toforder'])))
+        self.opts['MaxIterHE'] = 6 # optimal from token benchmark
+        self.opts['verbosity'] = 0 # silence HE warnings
+
+        self.wrot = 2*np.pi/self.period
+        self.mrot = self.wrot**2*self.s0**3/self.GM
+        it = 1
+        while (it < self.opts['MaxIterBar']):
+            it = it + 1
+            old_Js = self.Js
+            old_m = self.mrot
+            old_ro = self.rhoi
+
+            self.relax_to_HE(fixradius=True,fixmass=fixmass,fixrot=True)
+            self.update_densities(renorm=True)
+
+            dJs = np.abs((self.Js[1] - old_Js[1]))
+            drot = np.abs(old_m - self.mrot)
+            dro = np.var(self.rhoi[1:]/old_ro[1:])
+            if (drot < self.opts['drottol'] and
+                dJs < self.opts['dJtol'] and
+                dro < self.opts['drhotol']):
+                break
+        if it == self.opts['MaxIterBar']:
+            warnings.warn('Barotrope may not be fully converged.')
         return it
 
     def relax_to_HE(self, fixradius=True, fixmass=False, fixrot=False,
@@ -116,30 +157,22 @@ class TOFPlanet:
         self.aos = out.a0
 
         if fixradius:
-            self.si = self.si*self.radius/(self.si[0]*self.aos)
-            self.s0 = self.si[0]
-            self.a0 = self.s0*self.aos
-            self.M = _mass_int(self.si, self.rhoi)
+            self._fixradius()
         if fixmass:
-            self.rhoi = self.rhoi*self.mass/self.M
-            self.M = _mass_int(self.si, self.rhoi)
+            self._fixmass()
         if fixrot:
-            self.mrot = self.wrot**2*self.s0**3/(self.G*self.M)
-
+            self._fixrot()
         if pressure:
-            r = self.si
-            rho = self.rhoi
-            U = -self.G*self.mass/self.s0**3*self.si**2*self.A0
-            gradU = np.zeros_like(r)
-            gradU[0] = (U[0] - U[1])/(r[0] - r[1])
-            gradU[1:-1] = (U[0:-2] - U[2:])/(r[0:-2] - r[2:])
-            gradU[-1] = (U[-2] - U[-1])/(r[-2] - r[-1])
-            intgrnd = rho*gradU
-            P = np.zeros_like(r)
-            P[0] = self.P0
-            for k in range(P.size-1): # note integrate downward
-                P[k+1] = P[k] + 0.5*(r[k] - r[k+1])*(intgrnd[k] + intgrnd[k+1])
-            self.Pi = P
+            self._pressurize()
+
+    def update_densities(self,renorm=True):
+        # Call baro to set rhoi from Pi
+        self._pressurize()
+        self.rhoi = self.baro(self.Pi, self.si)
+        if renorm:
+            self._fixradius()
+            self._fixmass()
+            self._fixrot()
 
     def level_surfaces(self,mus):
         # Normalized r(cos(theta)) from shape functions
@@ -151,14 +184,46 @@ class TOFPlanet:
         return np.flipud(1 + shp)
 
     ### Private methods slash pseudo properties
+    def _fixradius(self):
+        self.si = self.si*self.radius/(self.si[0]*self.aos)
+        self.s0 = self.si[0]
+        self.a0 = self.s0*self.aos
+        self.M = _mass_int(self.si, self.rhoi)
+
+    def _fixmass(self):
+        self.rhoi = self.rhoi*self.mass/self.M
+        self.M = _mass_int(self.si, self.rhoi)
+
+    def _fixrot(self):
+        self.mrot = self.wrot**2*self.s0**3/(self.G*self.M)
+
+    def _pressurize(self):
+        r = self.si
+        rho = self.rhoi
+        U = -self.G*self.mass/self.s0**3*self.si**2*self.A0
+        gradU = np.zeros_like(r)
+        gradU[0] = (U[0] - U[1])/(r[0] - r[1])
+        gradU[1:-1] = (U[0:-2] - U[2:])/(r[0:-2] - r[2:])
+        gradU[-1] = (U[-2] - U[-1])/(r[-2] - r[-1])
+        intgrnd = rho*gradU
+        P = np.zeros_like(r)
+        P[0] = self.P0
+        for k in range(P.size-1): # note integrate downward
+            P[k+1] = P[k] + 0.5*(r[k] - r[k+1])*(intgrnd[k] + intgrnd[k+1])
+        self.Pi = P
+
     def _m2P(self):
-        return 2*np.pi/(np.sqrt(self.mrot*(self.G*self.M)/self.s0**3))
+        return 2*np.pi/(np.sqrt(self.mrot*(self.GM)/self.s0**3))
 
     def _P2m(self):
-        return (2*np.pi/self.period)**2*self.s0**3/(self.G*self.M)
+        return (2*np.pi/self.period)**2*self.s0**3/(self.GM)
+
+    def _P2q(self):
+        return (2*np.pi/self.period)**2*self.a0**3/(self.GM)
 
     def ai(self):
         return self.s0*self.level_surfaces(0) # level surfaces equatorial radii
+
     def bi(self):
         return self.s0*self.level_surfaces(1) # level surfaces polar radii
 
@@ -279,7 +344,9 @@ def _default_opts(kwargs):
     opts = {'toforder':4,
             'dJtol':1e-6,
             'drottol':1e-6,
+            'drhotol':1e-6,
             'MaxIterHE':60,
+            'MaxIterBar':60,
             'MaxIterRot':20,
             'xlevels':-1,
             'verbosity':1
@@ -298,14 +365,21 @@ class _default_planet:
     P0 = 1e5
     P = 0.41354*24*3600
 
+def _a_jupi(N):
+    tp = TOFPlanet()
+    a = -15*tp.mass/8/np.pi/tp.radius**3
+    zvec = np.linspace(1, 1/N, N)
+    dvec = a*zvec**2 - a
+    tp.si = zvec*tp.radius
+    tp.rhoi = dvec
+    return tp
+
 def _test(N,nx,torder):
-    obs = _default_planet()
-    tp = TOFPlanet(obs,xlevels=nx)
+    tp = TOFPlanet(xlevels=nx)
     zvec = np.linspace(1, 1/N, N)
     dvec = -3000*zvec**2 + 3000
     tp.si = zvec*tp.s0
     tp.rhoi = dvec
-    #a = - 15*obs.M/8/np.pi/obs.s0**3
     tp.opts['toforder'] = torder
     tic = timer()
     it = tp.relax_to_rotation()
