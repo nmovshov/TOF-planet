@@ -168,7 +168,7 @@ class TOFPlanet:
     def update_densities(self,renorm=True):
         # Call baro to set rhoi from Pi
         self._pressurize()
-        self.rhoi = self.baro(self.Pi, self.si)
+        self.rhoi = self.baro(self.Pi, self.si/self.s0)
         if renorm:
             self._fixradius()
             self._fixmass()
