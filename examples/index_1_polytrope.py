@@ -44,7 +44,7 @@ def poly1(P,r): return np.sqrt(P/K)
 
 
 # Set up TOFPlanet(s)
-N = 2**15 # around N=2^18 ToF7 gets more precise J2 than ToF4
+N = 2**12 # around N=2^18 ToF7 gets more precise J2 than ToF4
 nx = 128
 
 tofour = TOFPlanet(toforder=4)
@@ -76,14 +76,14 @@ tofour.opts['xlevels'] = nx
 tofour.opts['drhotol'] = 1e-6
 tofour.opts['dJtol'] = 1e-10
 tofour.opts['MaxIterBar'] = 60
-tofour.opts['MaxIterHE'] = 60
+tofour.opts['MIXL'] = 0
 tofour.relax_to_barotrope()
 
 tofsev.opts['xlevels'] = nx
 tofsev.opts['drhotol'] = 1e-6
 tofsev.opts['dJtol'] = 1e-10
 tofsev.opts['MaxIterBar'] = 60
-tofsev.opts['MaxIterHE'] = 60
+tofsev.opts['MIXL'] = 0
 tofsev.relax_to_barotrope()
 
 # Construct the benchmarking table
@@ -124,5 +124,5 @@ E = np.abs(A[1:,:] - A[0,:])
 WH16_diffs = pd.DataFrame(E, columns=cols, index=rows[1:])
 
 # Output
-pd.options.display.float_format = '{:.3e}'.format
+pd.options.display.float_format = '{:.4e}'.format
 print(WH16_diffs)

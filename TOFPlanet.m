@@ -275,7 +275,7 @@ classdef TOFPlanet < handle
             % Ready, set,...
             warning('off','TOF4:maxiter')
             warning('off','TOF7:maxiter')
-            obj.opts.MaxIterHE = 6;
+            obj.opts.MaxIterHE = 2;
             if obj.opts.toforder == 4
                 tofun = @tof4;
             else

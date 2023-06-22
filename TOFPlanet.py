@@ -99,11 +99,12 @@ class TOFPlanet:
         """Call relax_to_He repeatedly to converge shape/rotation/density."""
 
         self.Js = np.hstack((-1, np.zeros(self.opts['toforder'])))
-        self.opts['MaxIterHE'] = 6 # optimal from token benchmark
+        self.opts['MaxIterHE'] = 2
         self.opts['verbosity'] = 0 # silence HE warnings
 
         self.wrot = 2*np.pi/self.period
         self.mrot = self.wrot**2*self.s0**3/self.GM
+
         it = 1
         while (it < self.opts['MaxIterBar']):
             it = it + 1
@@ -342,7 +343,7 @@ def _mass_int(svec, dvec):
 def _default_opts(kwargs):
     """Return options dict used by TOFPlanet class methods."""
     opts = {'toforder':4,
-            'dJtol':1e-6,
+            'dJtol':1e-10,
             'drottol':1e-6,
             'drhotol':1e-6,
             'MaxIterHE':60,
@@ -374,7 +375,7 @@ def _a_jupi(N):
     tp.rhoi = dvec
     return tp
 
-def _test(N,nx,torder):
+def _test_rot(N,nx,torder):
     tp = TOFPlanet(xlevels=nx)
     zvec = np.linspace(1, 1/N, N)
     dvec = -3000*zvec**2 + 3000
@@ -395,6 +396,29 @@ def _test(N,nx,torder):
     print("I = {}".format(tp.NMoI))
     print("")
 
+def _test_baro(N,nx,torder):
+    tp = TOFPlanet(xlevels=nx)
+    zvec = np.linspace(1, 1/N, N)
+    dvec = -3000*zvec**2 + 3000
+    tp.si = zvec*tp.s0
+    tp.rhoi = dvec
+    tp.opts['toforder'] = torder
+    def poly1(P,r): return np.sqrt(P/2e5)
+    tp.set_barotrope(poly1)
+
+    tic = timer()
+    it = tp.relax_to_barotrope()
+    toc = timer()
+    print()
+    print(f"{N=}, {nx=}")
+    print(f"{it} iterations of tof{torder} in {toc-tic:.3g} sec.")
+    print("J0 = {}".format(tp.Js[0]))
+    print("J2 = {}".format(tp.Js[1]))
+    print("J4 = {}".format(tp.Js[2]))
+    print("J6 = {}".format(tp.Js[3]))
+    print("J8 = {}".format(tp.Js[4]))
+    print("I = {}".format(tp.NMoI))
+    print("")
+
 if __name__ == '__main__':
-    _test(4096,-1,4)
-#    _test(4096,-1,7)
+    _test_baro(4096,-1,4)

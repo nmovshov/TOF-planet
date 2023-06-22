@@ -11,7 +11,7 @@ function options = tofset(varargin)
 %KNOWN PROPERTIES
 %
 %toforder - Theory of figures expansion order [ {4} 7 ]
-%dJtol - Convergence tolerance for gravity coefficients [ positive real {1e-6} ]
+%dJtol - Convergence tolerance, absolute change on J2 [ positive real {1e-10} ]
 %drhotol - Convergence tolerance for density adjustment [ positive real {1e-6} ]
 %drottol - Convergence tolerance for rotation adjustment [ positive real {1e-6} ]
 %MaxIterBar - Number of iterations allowed for relaxation to barotrope [ positive integer {60} ]
@@ -31,7 +31,7 @@ p = inputParser;
 p.FunctionName = mfilename;
 
 p.addParameter('toforder', 4, @(n)(n==4)||(n==7))
-p.addParameter('dJtol',1e-6,@isposscalar)
+p.addParameter('dJtol',1e-10,@isposscalar)
 p.addParameter('drhotol',1e-6,@isposscalar)
 p.addParameter('drottol',1e-6,@isposscalar)
 p.addParameter('MaxIterBar',60,@isposintscalar)

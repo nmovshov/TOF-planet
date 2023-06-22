@@ -107,9 +107,9 @@ def tof4(zvec, dvec, mrot, **kwargs):
         # Now the Js, by eqs. B.1 and B.11
         new_Js, a0 = B111(ss, SS)
 
-        # Check for convergence to terminate
-        dJs = np.abs(Js - new_Js)/np.abs(Js + np.spacing(1))
-        if np.all(dJs < opts['tol']):
+        # Check for J2 convergence to terminate
+        dJs = np.abs(Js - new_Js)
+        if (it > 0) and (dJs[1] < opts['tol']):
             break
         Js = new_Js
 
@@ -139,7 +139,7 @@ def default_opts():
     """Return dict of default values for tof4's **kwargs."""
     opts = {}
     opts['xlevels'] = -1
-    opts['tol'] = 1e-6
+    opts['tol'] = 1e-10
     opts['maxiter'] = 100
     opts['calc_moi'] = False
     opts['ss_guesses'] = None

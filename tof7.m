@@ -27,8 +27,8 @@ function [Js, out] = tof7(zvec, dvec, mrot, varargin)
 %     Dimensionless rotation parameter. Recall m = w^2s0^3/GM.
 %
 % Inputs, NAME/VALUE pairs
-% tol : scalar, positive, (tol=1e-6)
-%     Convergence tolerance for relative changes in Js in successive iterations
+% tol : scalar, positive, (tol=1e-10)
+%     Convergence tolerance for absolute change in J2 in successive iterations
 %     (but keep in mind truncation error of ToF).
 % maxiter : scalar, positive, integer, (maxiter=100)
 %     Maximum number of algorithm iterations.
@@ -143,8 +143,8 @@ for iter=1:opts.maxiter
     [new_Js, a0] = B111(ss, SS);
 
     % Check for convergence to terminate
-    dJs = abs(Js - new_Js)./abs(Js+eps);
-    if all(dJs < opts.tol)
+    dJs = abs(Js - new_Js);
+    if (iter > 1) && (dJs(2) < opts.tol)
         break
     elseif iter < opts.maxiter
         Js = new_Js;
@@ -170,7 +170,7 @@ end
 function print_usage()
 fprintf('Usage:\n\ttof7(zvec,dvec,mrot,''name'',value)\n')
 fprintf('Name-Value pair arguments:\n')
-fprintf('tol - Convergence tolerance for gravity coefficients [ positive real {1e-6} ]\n')
+fprintf('tol - Convergence tolerance [ positive real {1e-10} ]\n')
 fprintf('maxiter - Number of iterations allowed for relaxation to equilibrium shape [ positive integer {100} ]\n')
 fprintf('xlevels - Solve shape functions on xlevels and spline the rest [ integer scalar or vector {-1} ]\n')
 fprintf('ss_guesses - Initial guess for shape functions [ scalar struct {[]} ]\n')
@@ -181,7 +181,7 @@ p = inputParser;
 p.FunctionName = 'tof7.m';
 
 p.addParameter('C7file',mfilename('fullpath'))
-p.addParameter('tol',1e-8,@(x)isscalar(x)&&isreal(x)&&x>0)
+p.addParameter('tol',1e-10,@(x)isscalar(x)&&isreal(x)&&x>0)
 p.addParameter('maxiter',100,@(x)isscalar(x)&&isreal(x)&&x>0&&mod(x,1)==0)
 p.addParameter('xlevels',-1,@(x)validateattributes(x,{'numeric'},{'vector','integer'}))
 p.addParameter('ss_guesses',struct(),@(x)isscalar(x)&&isstruct(x))
