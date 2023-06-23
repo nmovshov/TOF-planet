@@ -91,16 +91,8 @@ classdef TOFPlanet < handle
             % A simple constructor of TOFPlanet objects.
             % TOFPlanet(OBS,'OPTION1', VALUE, 'OPTION2', VALUE2,...)
             
-            % Set reference values from obs (or undocumented default planet)
-            if nargin == 0 % prefill critical fields with reasonable values
-                obs.pname = 'planet';
-                obs.M  = 1898.187e24;
-                obs.a0 = 71492e3;
-                obs.s0 = 69911e3;
-                obs.P0 = 1e5;
-                obs.P = 0.41354*24*3600;
-                obj.set_observables(obs);
-            elseif mod(nargin,2)
+            % Set reference values from obs
+            if mod(nargin,2)
                 obs = varargin{1};
                 obj.set_observables(obs);
                 varargin(1) = [];
@@ -111,7 +103,6 @@ classdef TOFPlanet < handle
             % Init privates
             obj.aos = 1;
             obj.G = 6.67430e-11; % m^3 kg^-1 s^-2 (2018 NIST reference)
-            obj.GM = obj.G*obj.mass;
         end
     end % End of constructor block
     
@@ -1580,13 +1571,11 @@ classdef TOFPlanet < handle
         end
         
         function val = get.qrot(obj)
-            if isempty(obj.GM), obj.GM = obj.G*obj.mass; end
-            val = obj.wrot^2.*obj.radius^3./obj.GM;
+            val = obj.wrot^2.*obj.radius^3./(obj.G*obj.mass);
         end
         
         function val = get.mrot(obj)
-            if isempty(obj.GM), obj.GM = obj.G*obj.mass; end
-            val = obj.wrot^2.*obj.s0^3./obj.GM;
+            val = obj.wrot^2.*obj.s0^3./(obj.G*obj.mass);
         end
         
         function set.mrot(~,~)

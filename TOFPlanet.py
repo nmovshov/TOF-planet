@@ -48,9 +48,8 @@ class TOFPlanet:
     def __init__(self, obs=None, **kwargs):
         self.G = 6.67430e-11 # m^3 kg^-1 s^-2 (2018 NIST reference)
         self.opts = _default_opts(kwargs) # holds user configurable options
-        if obs is None:
-            obs = _default_planet()
-        self.set_observables(obs)
+        if obs:
+            self.set_observables(obs)
         self.M = None
         self.NMoI = None
         self.Pi = None
@@ -367,7 +366,7 @@ class _default_planet:
     P = 0.41354*24*3600
 
 def _a_jupi(N):
-    tp = TOFPlanet()
+    tp = TOFPlanet(obs=_default_planet)
     a = -15*tp.mass/8/np.pi/tp.radius**3
     zvec = np.linspace(1, 1/N, N)
     dvec = a*zvec**2 - a
@@ -376,7 +375,7 @@ def _a_jupi(N):
     return tp
 
 def _test_rot(N,nx,torder):
-    tp = TOFPlanet(xlevels=nx)
+    tp = TOFPlanet(obs=_default_planet,xlevels=nx)
     zvec = np.linspace(1, 1/N, N)
     dvec = -3000*zvec**2 + 3000
     tp.si = zvec*tp.s0
@@ -397,7 +396,7 @@ def _test_rot(N,nx,torder):
     print("")
 
 def _test_baro(N,nx,torder):
-    tp = TOFPlanet(xlevels=nx)
+    tp = TOFPlanet(obs=_default_planet,xlevels=nx)
     zvec = np.linspace(1, 1/N, N)
     dvec = -3000*zvec**2 + 3000
     tp.si = zvec*tp.s0
