@@ -40,7 +40,7 @@ Prot = 2*np.pi/wrot
 aos = 1.022875431133185 # WH16 Table 3 Re/R
 K = 2.003565e5 # Hubbard to Guillot personal communication (no effect on Js)
 n = 1
-def poly1(P,r): return np.sqrt(P/K)
+def poly1(P): return np.sqrt(P/K)
 
 
 # Set up TOFPlanet(s)
@@ -51,6 +51,7 @@ tofour = TOFPlanet(toforder=4)
 tofour.opts['verbosity'] = 1
 tofour.name = f'{N}-point TOF4'
 tofour.G = G # undocumented TOFPlanet property
+tofour.GM = GM # undocumented TOFPlanet property
 tofour.mass = M
 tofour.radius = Re
 tofour.period = Prot # trying to match WH16 qrot
@@ -63,6 +64,7 @@ tofsev = TOFPlanet(toforder=7)
 tofsev.opts['verbosity'] = 1
 tofsev.name = f'{N}-point TOF7'
 tofsev.G = G # undocumented TOFPlanet property
+tofsev.GM = GM # undocumented TOFPlanet property
 tofsev.mass = M
 tofsev.radius = Re
 tofsev.period = Prot # trying to match WH16 qrot

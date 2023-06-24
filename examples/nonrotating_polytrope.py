@@ -46,14 +46,16 @@ R = 71492e3
 # with the known average density.
 n = 1 # polytrope index
 K = 2*G/np.pi*R**2 # polytrope constant
-def poly1(P,r): return np.sqrt(P/K)
+def poly1(P): return np.sqrt(P/K)
 
 N = 2**np.arange(12,16)
 TPS = []
 for n in N:
     tp = TOFPlanet()
     tp.name = f'tp{n}'
+    tp.G = G
     tp.mass = M
+    tp.GM = G*M
     tp.radius = R
     tp.si = R*np.linspace(1, 1/n, n)
     tp.rhoi = np.ones(n)*M/(4*np.pi/3*R**3)
