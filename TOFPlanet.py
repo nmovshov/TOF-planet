@@ -61,11 +61,10 @@ class TOFPlanet:
         self.name = obs.pname
         self.mass = obs.M
         self.radius = obs.a0
-        self.s0 = obs.s0
         self.P0 = obs.P0
         self.period = obs.P
         self.GM = self.G*self.mass
-        self.rhobar = self.mass/(4*np.pi/3*self.s0**3)
+        self.rhobar = self.mass/(4*np.pi/3*obs.s0**3)
 
     def set_barotrope(self, fun):
         """Store a function with signature density = f(pressure, radius)."""
@@ -79,7 +78,7 @@ class TOFPlanet:
         self.opts['verbosity'] = 0 # silence HE warnings
 
         self.wrot = 2*np.pi/self.period
-        self.mrot = self.wrot**2*self.s0**3/self.GM
+        self.mrot = self.wrot**2*self.si[0]**3/self.GM
         it = 1
         while (it < self.opts['MaxIterRot']) and (self.mrot > 0):
             it = it + 1
@@ -102,7 +101,7 @@ class TOFPlanet:
         self.opts['verbosity'] = 0 # silence HE warnings
 
         self.wrot = 2*np.pi/self.period
-        self.mrot = self.wrot**2*self.s0**3/self.GM
+        self.mrot = self.wrot**2*self.si[0]**3/self.GM
 
         it = 1
         while (it < self.opts['MaxIterBar']):
@@ -231,7 +230,7 @@ class TOFPlanet:
     def plot_rho_of_r(self):
         import matplotlib.pyplot as plt
         fig = plt.figure(figsize=(8,6))
-        x = np.append(self.si/self.s0, 0)
+        x = np.append(self.si/self.si[0], 0)
         y = np.append(self.rhoi, self.rhoi[-1])/1000
         plt.plot(x, y, lw=2, label=self.name)
         plt.xlabel(r'Level surface radius, $s/s_0$', fontsize=12)
@@ -241,7 +240,7 @@ class TOFPlanet:
     def plot_P_of_r(self):
         import matplotlib.pyplot as plt
         fig = plt.figure(figsize=(8,6))
-        x = self.si/self.s0
+        x = self.si/self.si[0]
         y = self.Pi/1e9
         plt.plot(x, y, lw=2, label=self.name)
         plt.xlabel(r'Level surface radius, $s/s_0$', fontsize=12)
