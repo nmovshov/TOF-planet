@@ -7,6 +7,9 @@ import tof7
 import warnings
 from timeit import default_timer as timer
 
+class TPError(Exception):
+    pass
+
 class TOFPlanet:
     """Interior model of rotating fluid planet.
 
@@ -168,6 +171,8 @@ class TOFPlanet:
         # Call baro to set rhoi from Pi
         self._pressurize()
         self.rhoi = self.baro(self.Pi)
+        if np.any(np.diff(self.rhoi) < 0):
+            raise TPError("barotrope created density inversion!")
         if renorm:
             self._fixradius()
             self._fixmass()
@@ -398,10 +403,10 @@ def _test_baro(N,nx,torder):
     tp = TOFPlanet(obs=_default_planet,xlevels=nx)
     zvec = np.linspace(1, 1/N, N)
     dvec = -3000*zvec**2 + 3000
-    tp.si = zvec*tp.s0
+    tp.si = zvec*tp.radius
     tp.rhoi = dvec
     tp.opts['toforder'] = torder
-    def poly1(P,r): return np.sqrt(P/2e5)
+    def poly1(P): return np.sqrt(P/2e5)
     tp.set_barotrope(poly1)
 
     tic = timer()
